@@ -21,7 +21,14 @@ General docstring format:
 
 @Singleton
 class App
-    Initializes tk interface
+    def __init__()
+        create root
+        create all frames, canvases, labels, etc. and grid them all.
+
+    def make_bindings(game)
+        Bind keypresses and buttons
+
+    def play again()
 
     def reset_game_cvs(new_image)
         Reset the game_canvas to show new_image
@@ -29,9 +36,11 @@ class App
     def reset_next_cvs(new_image)
         Reset the next_canvas to show new_image
 
-    def get_ready(game)
+    def get_ready()
         Create a popup explaining controls and giving a button to click to start the game.
-        When the button is clicked, destroy popup window and call game.start()
+
+    def lose(game)
+        Game Over popup window. Display stats. Two buttons: one to play again one to quit.
 
 
 class Game
@@ -39,11 +48,26 @@ class Game
     Contains functions for rendering, piece movement, and coordinate checking
 
     def __init__()
+        self.app = App.instance()
+
+    def prepare()
+        Create all function variables and set them to init vals or None
         Create a list to keep track of all static blocks.
         Create a var for current piece being used. Set to None
+        self.speed
+        self.hold = None
+        lower_loop = Lower_Piece_Thread()
+        Create Piece_Buffer
+        App.get_ready() then self.start()
 
     def start()
         current piece = self.Piece_Buffer().next()
+        lower_loop.start()
+
+    def hold()
+        self.hold = self.current.copy()
+        self.current = Piece_Buffer.next()
+        Update hold_cvs
 
 
     @property   # Getter
@@ -54,6 +78,7 @@ class Game
         Iterate through the _PIECE_object and add each block to the list
         For each block being added to the list, list[Block.coord] = Block.color
         If not a _PIECE_object, make all elements None.
+
 
     def lower_piece()
         temp variable describing new position. Test to see if this temp var conflicts with permanent gameboard pieces (including checking for IndexError for if piece is at the bottom). If it does, this piece becomes permanent and carry on to next piece. If not make temp var the new coords and update_game_field().
@@ -72,6 +97,8 @@ class Game
         Then check rows affected by these new blocks. If any row is completed, remove them from the gameboard's list and add to score and speed.
         At sometime in this procession, call Piece_Buffer to find next current piece.
         Do update_game_field() or a special effect for lines completed
+        Stop mainloop() and lower_piece_loop in some of these cases
+
 
     async def update_game_field()
         new_image = self.render()
@@ -81,24 +108,18 @@ class Game
         Adds _PIECE_object's coords to the static_block_list (not actually, via by copy or just adding it post what happens next). The current _PIECE_object's image will often fall off the edges of this image, account for this and cut those parts off. Create a big image for a blank game field. For each coord, create a square image of the color given at that coord. For each square image, replace that part of the image (at that coord, transformed to be in pixels). Finally, return that image.
 
 
-    class Thread
+    class Lower_Piece_Thread
         def __init__()
             current = None
 
-        def start_thread()
+        def start()
             Run thread() and set current object to that thread (not right term. future, subthread, something) object. Research exactly how to get this thread object in asyncio
 
-        def stop_thread()
+        def stop()
             if current is None: pass
             end the thread referenced by current. Research how to do this. thread.exit() or something like that.
             current = None
 
-        async def thread()
-            while True:
-                pass
-
-
-    class Lower_Piece_Loop(Thread)
         async def thread()
             constant loop in separate thread to continuously call Game.lower_piece.
             Use game.speed in a wait() funciton
@@ -157,6 +178,4 @@ class Game
                     self.color = color
 
 if __name__ == '__main__':
-    App.instance()
-    game = Game()
-    App.instance().get_ready(game)
+    Game().prepare()
