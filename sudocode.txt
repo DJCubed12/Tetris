@@ -18,47 +18,19 @@ General docstring format:
 
     """
 
-class Game
-    Controls the Gameboard and the tk App. Manages all loops and subthreads.
 
-    def __init__()
-        create App and Gameboard objects
+async def update_game_field()
+    new_image = Gameboard.render()
+    App.instance().reset_game_cvs(new_image)
+    # DECIDE IF THIS SHOULD BE DONE CONSTANTLY (create a thread with a infinite loop) OR AFTER EVERY MOVEMENT (after every call to Gameboard)
 
-    async def update_game_field()
-        new_image = Gameboard.render()
-        App.reset_game_cvs(new_image)
-        # DECIDE IF THIS SHOULD BE DONE CONSTANTLY (create a thread with a infinite loop) OR AFTER EVERY MOVEMENT (after every call to Gameboard)
-
-    async def update_stats(lines_made)
-        Update the score. Update score in App
-        Check to increase speed
-
-    async def lower_piece()
-        constant loop in separate thread to continuously call Gameboard.lower_piece.
-        Use self.speed in a wait() funciton
-        # Instead of making this a loop, you could just make the Gameboard.lower_piece call asyncronous and call this funciton again (recursion that would keep time accurately)
-
-    class Piece_Buffer
-        Iterator that continuously creates random _PIECE_objects. 5 are kept in a list at all times. Will be iterated by the GameBoard object itself.
-
-        def __init__(App)
-        Piece list = []
-            Call rand_piece() 5 times to fill initial piece list
-
-        def rand_piece()
-            Randomly create a _PIECE_object and add to the piece list
-
-        async def update_next_cvs()
-            Call _PIECE_.render() for each piece in the piece list and stitch them together.
-            App.reset_next_cvs(new_image)
-
-        def __iter__()
-        def __next__()
-            pop first piece out of list. rand_piece() a replacement.
-            update_next_cvs()
-            return poped _PIECE_object
+async def lower_piece(game)
+    constant loop in separate thread to continuously call Game.lower_piece.
+    Use game.speed in a wait() funciton
+    # Instead of making this a loop, you could just make the Game.lower_piece call asyncronous and call this function again (recursion that would keep time accurately)
 
 
+@Singleton
 class App
     Initializes tk interface
 
@@ -68,14 +40,22 @@ class App
     def reset_next_cvs(new_image)
         Reset the next_canvas to show new_image
 
+    def get_ready(game)
+        Create a popup explaining controls and giving a button to click to start the game.
+        When the button is clicked, destroy popup window and call game.start()
 
-class Gameboard
+
+class Game
     A object that keeps track of a grid 10x20 where the game will be ran.
     Contains functions for rendering, piece movement, and coordinate checking
 
-    def __init__(Piece_Buffer)
+    def __init__()
         Create a list to keep track of all static blocks.
-        Create a var for current piece being used. call Piece_Buffer for this initial _PIECE_object
+        Create a var for current piece being used. Set to None
+
+    def start()
+        current piece = self.Piece_Buffer().next()
+
 
     @property   # Getter
     def static_block_list()
@@ -93,47 +73,73 @@ class Gameboard
         calls the objects rotate method and checks to see if it conflicts with gameboard. If so, pass (ignore rotation).
 
     def move_left/right()
-        get the coords of the current peice, subtract/add 1 to each x coord and test for conflicts with current gameboard (including if it falls off the game field). If so, ignore the movement. Otherwise change the piece's coords to match
+        get the coords of the current piece, subtract/add 1 to each x coord and test for conflicts with current gameboard (including if it falls off the game field). If so, ignore the movement. Otherwise change the piece's coords to match
 
     def fast_drop()
         drop to the lowest unconflicting spot and become permanent. Iterate through lower_piece until it becomes permanent
 
     def make_permanent()
         makes the once dynamic _PIECE_object a static collection of Block objects. Do this by iterating through the piece object and adding the Block objects to the gameboard's list of static blocks. If there is a block that raises an IndexError (higher than the top of the game field), lose game.
-        Then check rows affected by these new blocks. If any row is completed, remove them from the gameboard's list and add to score and such.
+        Then check rows affected by these new blocks. If any row is completed, remove them from the gameboard's list and add to score and speed.
         At sometime in this procession, call Piece_Buffer to find next current piece.
 
     def render()
         Adds _PIECE_object's coords to the static_block_list (not actually, via by copy or just adding it post what happens next). The current _PIECE_object's image will often fall off the edges of this image, account for this and cut those parts off. Create a big image for a blank game field. For each coord, create a square image of the color given at that coord. For each square image, replace that part of the image (at that coord, transformed to be in pixels). Finally, return that image.
 
 
-for each tetris piece, inherit from a general PIECE object
-class _PIECE_
-    class level var that define the shape (coords of each block)
-    class level var that give the color of the shape's Blocks
-    iterator - when iterated create self.Block objects and return all of them
+    class Piece_Buffer
+        Iterator that continuously creates random _PIECE_objects. 5 are kept in a list at all times. Will be iterated by the GameBoard object itself.
 
-    def __init__()
-        Create a coords variable to record current position on gameboard
+        def __init__()
+        Piece list = []
+            Call rand_piece() 5 times to fill initial piece list
 
-    def __iter__()
-        foreach coord create a Block object and store it in a list var
+        def rand_piece()
+            Randomly create a _PIECE_object and add to the piece list
 
-    def __next__()
-        return a Block object from the blocks list var
+        async def update_next_cvs()
+            Call _PIECE_.render() for each piece in the piece list and stitch them together.
+            App.instance().reset_next_cvs(new_image)
 
-    def rotate(current_coords, bool left/right)
-        takes the current coordinates and applies the correct transformation to return new coordinates for where the piece will be after the spin.
+        def __iter__()
+        def __next__()
+            pop first piece out of list. rand_piece() a replacement.
+            update_next_cvs()
+            return poped _PIECE_object
 
-    def render()
-        create a image representing the piece.
-        Pad the image according to a global piece padding variable.
-        Return the image
 
-    class Block
-        A 1 by 1 block that is part of a _PIECE_.
-        Has a coord variable
+        for each tetris piece, inherit from a general PIECE object
+        class _PIECE_
+            class level var that define the shape (coords of each block)
+            class level var that give the color of the shape's Blocks
+            iterator - when iterated create self.Block objects and return all of them
 
-        def __init__(coord, _PIECE_'s_color)
-            self.coord = coord
-            self.color = color
+            def __init__()
+                Create a coords variable to record current position on gameboard
+
+            def __iter__()
+                foreach coord create a Block object and store it in a list var
+
+            def __next__()
+                return a Block object from the blocks list var
+
+            def rotate(current_coords, bool left/right)
+                takes the current coordinates and applies the correct transformation to return new coordinates for where the piece will be after the spin.
+
+            def render()
+                create a image representing the piece.
+                Pad the image according to a global piece padding variable.
+                Return the image
+
+            class Block
+                A 1 by 1 block that is part of a _PIECE_.
+                Has a coord variable
+
+                def __init__(coord, _PIECE_'s_color)
+                    self.coord = coord
+                    self.color = color
+
+if __name__ == '__main__':
+    App.instance()
+    game = Game()
+    App.instance().get_ready(game)
