@@ -48,12 +48,11 @@ class App:
 
     def run(self):
         """Starts the main event loop for the tkinter application."""
-
-        self.test = PIL.ImageTk.PhotoImage(file=r'statics\testbw.jpg')
-        self.game_cvs.delete('all')
-        self.game_cvs.create_image((0,0), image=self.test)
-
         self.root.mainloop()
+
+    def stop(self):
+        """Stop the tk event loop."""
+        self.root.quit()
 
 
 if __name__ == '__main__':
