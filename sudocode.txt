@@ -18,7 +18,6 @@ General docstring format:
 
     """
 
-
 @Singleton
 class App
     def __init__()
@@ -27,8 +26,6 @@ class App
 
     def make_bindings(game)
         Bind keypresses and buttons
-
-    def play again()
 
     def reset_game_cvs(new_image)
         Reset the game_canvas to show new_image
