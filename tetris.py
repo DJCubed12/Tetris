@@ -1,9 +1,13 @@
 import tkinter as tk
 from random import choice
+from copy import deepcopy
 
 # DPI Awareness
-import ctypes
-ctypes.windll.shcore.SetProcessDpiAwareness(1)
+try:
+    import ctypes
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except:
+    pass
 
 import PIL.Image
 import PIL.ImageTk
@@ -79,7 +83,23 @@ def render(field):
     return PIL.ImageTk.PhotoImage(im)
 
 class App:
-    """Controls the tkinter application used as an interface for the game."""
+    """Controls the tkinter application used as an interface for the game.
+
+    Instance Variables
+    ------------------
+    game_cvs : tk.Canvas
+        Canvas for displaying the gamefield.
+    hold_cvs : tk.Canvas
+        Canvas for displaying held tetris pieces.
+    next_cvs : tk.Canvas
+        Canvas for displaying incoming pieces (pieces in Game.Piece_Buffer).
+    root : tk.Tk
+        Root of the tk application.
+    score_lbl : tk.Label
+        Label widget to display current score.
+    _game_im : PIL.ImageTk.PhotoImage
+        Variable to hold game_cvs's displayed image in memory.
+    """
     global tk, PIL
 
     def __init__(self):
@@ -100,30 +120,58 @@ class App:
 
         # HOLD CANVAS
         self.hold_cvs = tk.Canvas(self.root)
-        self.hold_cvs.grid(row=0, column=0, sticky='nesw')
+        self.hold_cvs.grid(row=0, column=0, sticky='new')
+
+        # Size
+        hold_size = Constants.BLOCK_SIZE * 4
+        self.hold_cvs.config(width=hold_size, height=hold_size)
+
         # DEBUG
         self.hold_cvs['bg'] = 'blue'
+
+        # Init image
+        self._hold_im = PIL.Image.new('RGB', (hold_size, hold_size), Palette.BLANK)
+        self._hold_im = PIL.ImageTk.PhotoImage(self._hold_im)
+        # Position is the center of  the image, hence the / 2
+        self.hold_cvs.create_image((hold_size / 2, hold_size / 2), image=self._hold_im)
 
 
         # GAMEFIELD CANVAS
         self.game_cvs = tk.Canvas(self.root)
         self.game_cvs.grid(row=0, column=1, rowspan=2, sticky='nesw')
-        # Size
-        self.game_cvs.config(width=Constants.GAME_SIZE[0], height=Constants.GAME_SIZE[1])
+
+        # Size (More so for readability)
+        game_sizex = Constants.GAME_SIZE[0]
+        game_sizey = Constants.GAME_SIZE[1]
+        self.game_cvs.config(width=game_sizex, height=game_sizey)
+
         # DEBUG
         self.game_cvs['bg'] = 'orange'
 
         # Init image
-        self._game_im = PIL.Image.new('RGB', Constants.GAME_SIZE, Palette.BLANK)
+        self._game_im = PIL.Image.new('RGB', (game_sizex, game_sizey), Palette.BLANK)
         self._game_im = PIL.ImageTk.PhotoImage(self._game_im)
-        self.game_cvs.create_image((Constants.GAME_SIZE[0] / 2, Constants.GAME_SIZE[1] / 2), image=self._game_im)
+        self.game_cvs.create_image((game_sizex / 2, game_sizey / 2), image=self._game_im)
 
 
         # NEXT CANVAS
         self.next_cvs = tk.Canvas(self.root)
-        self.next_cvs.grid(row=0, column=2, sticky='nesw')
+        self.next_cvs.grid(row=0, column=2, sticky='new')
+
+        # Size
+        # Piece size is 4, plus offset on each side is 6
+        next_sizex = Constants.BLOCK_SIZE * 4
+        # Don't double vertical offsets
+        next_sizey = (2 * Constants.BLOCK_SIZE * 5) + (4 * Constants.BLOCK_SIZE)
+        self.next_cvs.config(width=next_sizex, height=next_sizey)
+
         # DEBUG
         self.next_cvs['bg'] = 'green'
+
+        # Init image
+        self._next_im = PIL.Image.new('RGB', (next_sizex, next_sizey), Palette.BLANK)
+        self._next_im = PIL.ImageTk.PhotoImage(self._next_im)
+        self.next_cvs.create_image((next_sizex / 2, next_sizey / 2), image=self._next_im)
 
 
         # SCORE LABEL
@@ -289,15 +337,22 @@ class Game:
 class Piece:
     """Base class for tetris piece. Can be used as an iterator to get Block objects.
 
+    Class variables
+    ---------------
+    color : int tuple
+        A 3 element list with 0 to 255 range decribing the rbg color to be shown when Blocks are rendered.
+    _init_orient : bool list
+        A 4 by 4 list of booleans describing the relative positions of all Blocks in the initial orientation.
+
     Instance variables
     ------------------
     orientation : bool list
         A 4 by 4 list of booleans describing the relative positions of all Blocks.
-    color : int tuple
-        A 3 element list with 0 to 255 range decribing the rbg color to be shown when Blocks are rendered.
     """
-
     global Palette
+
+    _init_orient = [[False for x in range(4)] for y in range(4)]
+    color = Palette.BLANK
 
     def __init__(self, orientation=None):
         """Initializes the orientation and color variables.
@@ -308,11 +363,88 @@ class Piece:
             An optional starting orientation. Used when rotating a piece so that it's new position can be tested before replacing origional orientation. A 4 by 4 list of booleans describing the relative positions of all Blocks.
         """
         if orientation is None:
-            self.orientation = [[False for x in range(4)] for y in range(4)]
+            global deepcopy
+            self.orientation = deepcopy(self._init_orient)
         else:
             self.orientation = orientation
 
-        self.color = Palette.BLANK
+
+    def rotate_cw(self):
+        """Rotates the Piece clockwise.
+
+        Calculates a new orientation grid and returns a new Piece-like object (same type as this one) with that orientation.
+
+        Returns
+        -------
+        Piece-like
+            The same type of piece but with an orientation grid rotated clockwise.
+        """
+        new_orientation = [[False for x in range(4)] for y in range(4)]
+
+        # Rotate
+        for y, row in enumerate(self.orientation):
+            for x, block in enumerate(row):
+                new_orientation[x][3-y] = block
+
+        new_orientation = self._push_topleft(new_orientation)
+
+        return self.__class__(new_orientation)
+
+    def rotate_ccw(self):
+        """Rotates the Piece clockwise.
+
+        Calculates a new orientation grid and returns a new Piece-like object (same type as this one) with that orientation.
+
+        Returns
+        -------
+        Piece-like
+            The same type of piece but with an orientation grid rotated clockwise.
+        """
+        new_orientation = [[False for x in range(4)] for y in range(4)]
+
+        # Rotate
+        for y, row in enumerate(self.orientation):
+            for x, block in enumerate(row):
+                new_orientation[3-x][y] = block
+
+        new_orientation = self._push_topleft(new_orientation)
+
+        return self.__class__(new_orientation)
+
+    def _push_topleft(self, orient):
+        """Pushes blocks in orient as far to the topleft as possible.
+
+        Parameters
+        ----------
+        orient : bool list
+            The 4 by 4 array of booleans describing relative block positions
+
+        Returns
+        -------
+        bool list
+            The same 4 by 4 array but with the contents pushed to the top left.
+        """
+        # Check for blank rows, move up
+        while True:
+            try:
+                for block in orient[0]:
+                    if block:
+                        raise StopIteration
+                blank = orient.pop(0)
+                orient.append(blank)
+            except StopIteration:
+                break
+
+        # Check for blank columns, move left
+        for row in orient:
+            if row[0]:
+                break
+        else:
+            for row in orient:
+                row.append(row.pop(0))
+
+        return orient
+
 
     def __iter__(self):
         """Creates Block objects representing the current orientation.
@@ -327,8 +459,8 @@ class Piece:
         blocks = []
 
         for y, row in enumerate(self.orientation):
-            for x, tf in enumerate(row):
-                if tf:
+            for x, block in enumerate(row):
+                if block:
                     blocks.append(self.Block(self.color, y, x))
 
         return blocks
@@ -379,88 +511,74 @@ class Piece:
 
 class I_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [True, False, False, False],
         [True, False, False, False],
         [True, False, False, False],
         [True, False, False, False]
-        ]
-
-        self.color = Palette.I
+    ]
+    color = Palette.I
 class J_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [False, True, False, False],
         [False, True, False, False],
         [True, True, False, False],
         [False, False, False, False]
-        ]
-
-        self.color = Palette.J
+    ]
+    color = Palette.J
 class L_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [True, False, False, False],
         [True, False, False, False],
         [True, True, False, False],
         [False, False, False, False]
-        ]
-
-        self.color = Palette.L
+    ]
+    color = Palette.L
 class S_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [False, True, True, False],
         [True, True, False, False],
         [False, False, False, False],
         [False, False, False, False]
-        ]
-
-        self.color = Palette.S
+    ]
+    color = Palette.S
 class Z_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [True, True, False, False],
         [False, True, True, False],
         [False, False, False, False],
         [False, False, False, False]
-        ]
-
-        self.color = Palette.Z
+    ]
+    color = Palette.Z
 class O_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [True, True, False, False],
         [True, True, False, False],
         [False, False, False, False],
         [False, False, False, False]
-        ]
+    ]
+    color = Palette.O
 
-        self.color = Palette.O
+    def rotate_cw(self):
+        """Overrides Piece.rotate_cw. Returns self to avoid issues."""
+        return self
+    def rotate_ccw(self):
+        """Overrides Piece.rotate_cw. Returns self to avoid issues."""
+        return self
 class T_Piece(Piece):
 
-    def __init__(self):
-        """Initializes the orientation and color variables."""
-        self.orientation = [
+    _init_orient = [
         [False, True, False, False],
         [True, True, True, False],
         [False, False, False, False],
         [False, False, False, False]
-        ]
-
-        self.color = Palette.T
+    ]
+    color = Palette.T
 
 PIECES = (I_Piece, J_Piece, L_Piece, S_Piece, Z_Piece, O_Piece, T_Piece)
 
@@ -468,7 +586,16 @@ PIECES = (I_Piece, J_Piece, L_Piece, S_Piece, Z_Piece, O_Piece, T_Piece)
 if __name__ == '__main__':
     game = Game()
 
-    game.app.run()
+    for p in PIECES:
+        print(f'*** Piece: {p}')
+        print()
+
+        x = p()
+        print(x)
+
+        for i in range(4):
+            x = x.rotate_cw()
+            print(x)
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
     # input('Enter to quit: ')
