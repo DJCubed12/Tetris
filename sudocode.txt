@@ -18,6 +18,11 @@ General docstring format:
 
     """
 
+*** NOTES ***
+Background = rgb(127, 127, 127)
+
+
+
 @Singleton
 class App
     def __init__()
