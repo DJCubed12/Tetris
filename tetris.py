@@ -436,12 +436,12 @@ class Piece:
                 break
 
         # Check for blank columns, move left
-        for row in orient:
-            if row[0]:
-                break
-        else:
-            for row in orient:
-                row.append(row.pop(0))
+        # for row in orient:
+        #     if row[0]:
+        #         break
+        # else:
+        #     for row in orient:
+        #         row.append(row.pop(0))
 
         return orient
 
@@ -594,7 +594,7 @@ if __name__ == '__main__':
         print(x)
 
         for i in range(4):
-            x = x.rotate_cw()
+            x = x.rotate_ccw()
             print(x)
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
