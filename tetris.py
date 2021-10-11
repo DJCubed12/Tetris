@@ -222,19 +222,19 @@ class App:
         self.root.quit()
 
 
-    def update_game(self, im):
+    def update_game(self, new_image):
         """Update the image in the game canvas.
 
         Clear self.game_cvs. Convert PIL Image to PIL ImageTk and place on game_cvs.
 
         Parameters
         ----------
-        im : PIL.Image
-            A PIL Image object
+        new_image : PIL.Image
+            The new image to display. Must be PIL.Image not PIL.ImageTk.
         """
         self.game_cvs.delete('all')
 
-        self._game_im = im
+        self._game_im = PIL.ImageTk.PhotoImage(new_image)
         self.game_cvs.create_image(self._game_im_center, image=self._game_im)
 
     def update_next(self, new_image):
@@ -245,7 +245,7 @@ class App:
         Parameters
         ----------
         new_image : PIL.Image
-            A PIL Image object
+            The new image to display. Must be PIL.Image not PIL.ImageTk.
         """
         self.next_cvs.delete('all')
 
@@ -260,7 +260,7 @@ class App:
         Parameters
         ----------
         new_image : PIL.Image
-            A PIL Image object
+            The new image to display. Must be PIL.Image not PIL.ImageTk.
         """
         self.hold_cvs.delete('all')
 
