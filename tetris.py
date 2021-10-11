@@ -48,7 +48,16 @@ class Palette:
 BLANK_SQUARE = PIL.Image.new('RGB', (Constants.BLOCK_SIZE, Constants.BLOCK_SIZE), Palette.BLANK)
 
 
-def render(field):
+def init():
+    """To be called when game is created. Sets up some global variables including the profiles of each Piece child class."""
+    global PIECES
+
+    for p in PIECES:
+        p().gen_profile()
+
+# render will place Palette colors according to any pieces in the field
+
+def render(field, return_tk_image=True):
     """Converts the list field to a PIL.ImageTk.PhotoImage object and returns it.
 
     Creates a blank image with size GAME_SIZE. Then iterates through the entire list, placing squares on the image with the appropiate color with the size BLOCK_SIZE. If element is None, it becomes an blank square. If Block, a square with the block's color is used. There SHOULD BE NO Pieces in list, they should be preformated to be Blocks.
@@ -56,12 +65,16 @@ def render(field):
     Parameters
     ----------
     field : list
-        A 2 dimensional list containing None and/or Block objects to be converted to an image.
+        A 2 dimensional list containing None and/or Palette colors to be converted to an image.
+    return_tk_image : bool (default = True)
+        Determines if the image returned should be a PIL.ImageTk.PhotoImage or a regular PIL.Image. For PIL.ImageTk.PhotoImage, use True.
 
     Returns
     -------
     PIL.ImageTk.PhotoImage
         Image of field to be displayed in a tk.canvas.
+    PIL.Image
+        Image of field to be stitched with other images.
     """
     global Constants
     global BLANK_SQUARE
@@ -73,14 +86,16 @@ def render(field):
 
     for y, row in enumerate(field):
         for x, block in enumerate(row):
+            # block will be either None or a Palette color
             if block:
                 box = (x * Constants.BLOCK_SIZE, y * Constants.BLOCK_SIZE, (x+1) * Constants.BLOCK_SIZE, (y+1) * Constants.BLOCK_SIZE)
 
-                print(box)
+                # block is a Palette color
+                im.paste(block, box)
 
-                im.paste(block.color, box)
-
-    return PIL.ImageTk.PhotoImage(im)
+    if return_tk_image:
+        im = PIL.ImageTk.PhotoImage(im)
+    return im
 
 class App:
     """Controls the tkinter application used as an interface for the game.
@@ -99,6 +114,16 @@ class App:
         Label widget to display current score.
     _game_im : PIL.ImageTk.PhotoImage
         Variable to hold game_cvs's displayed image in memory.
+    _game_im_center : int tuple
+        2 element tuple giving the center coord of game_cvs for _game_im.
+    _hold_im : PIL.ImageTk.PhotoImage
+        Variable to hold hold_cvs's displayed image in memory.
+    _hold_im_center : int tuple
+        2 element tuple giving the center coord of hold_cvs for _hold_im.
+    _next_im : PIL.ImageTk.PhotoImage
+        Variable to hold next_cvs's displayed image in memory.
+    _next_im_center : int tuple
+        2 element tuple giving the center coord of next_cvs for _next_im.
     """
     global tk, PIL
 
@@ -130,10 +155,11 @@ class App:
         self.hold_cvs['bg'] = 'blue'
 
         # Init image
+        # Position is the center of the image, hence the / 2
+        self._hold_im_center = (hold_size / 2, hold_size / 2)
         self._hold_im = PIL.Image.new('RGB', (hold_size, hold_size), Palette.BLANK)
         self._hold_im = PIL.ImageTk.PhotoImage(self._hold_im)
-        # Position is the center of  the image, hence the / 2
-        self.hold_cvs.create_image((hold_size / 2, hold_size / 2), image=self._hold_im)
+        self.hold_cvs.create_image(self._hold_im_center, image=self._hold_im)
 
 
         # GAMEFIELD CANVAS
@@ -149,9 +175,10 @@ class App:
         self.game_cvs['bg'] = 'orange'
 
         # Init image
+        self._game_im_center = (game_sizex / 2, game_sizey / 2)
         self._game_im = PIL.Image.new('RGB', (game_sizex, game_sizey), Palette.BLANK)
         self._game_im = PIL.ImageTk.PhotoImage(self._game_im)
-        self.game_cvs.create_image((game_sizex / 2, game_sizey / 2), image=self._game_im)
+        self.game_cvs.create_image(self._game_im_center, image=self._game_im)
 
 
         # NEXT CANVAS
@@ -159,24 +186,24 @@ class App:
         self.next_cvs.grid(row=0, column=2, sticky='new')
 
         # Size
-        # Piece size is 4, plus offset on each side is 6
         next_sizex = Constants.BLOCK_SIZE * 4
-        # Don't double vertical offsets
-        next_sizey = (2 * Constants.BLOCK_SIZE * 5) + (4 * Constants.BLOCK_SIZE)
+        # 5 blocks, 2 lines each, plus a gap between each = 14
+        next_sizey = 14 * Constants.BLOCK_SIZE
         self.next_cvs.config(width=next_sizex, height=next_sizey)
 
         # DEBUG
         self.next_cvs['bg'] = 'green'
 
         # Init image
+        self._next_im_center = (next_sizex / 2, next_sizey / 2)
         self._next_im = PIL.Image.new('RGB', (next_sizex, next_sizey), Palette.BLANK)
         self._next_im = PIL.ImageTk.PhotoImage(self._next_im)
-        self.next_cvs.create_image((next_sizex / 2, next_sizey / 2), image=self._next_im)
+        self.next_cvs.create_image(self._next_im_center, image=self._next_im)
 
 
         # SCORE LABEL
         self.score_lbl = tk.Label(self.root, text='Score:\n0')
-        self.score_lbl.grid(row=1, column=2, sticky='esw')
+        self.score_lbl.grid(row=1, column=0, sticky='esw')
 
     def get_ready(self):
         """Show a pop-up window with instructions and a start button."""
@@ -205,7 +232,7 @@ class App:
         self.game_cvs.delete('all')
 
         self._game_im = im
-        self.game_cvs.create_image((Constants.GAME_SIZE[0] / 2, Constants.GAME_SIZE[1] / 2), image=self._game_im)
+        self.game_cvs.create_image(self._game_im_center, image=self._game_im)
 
     def update_next(self, new_image):
         """Update the image in the next canvas.
@@ -220,7 +247,7 @@ class App:
         self.next_cvs.delete('all')
 
         self._next_im = PIL.ImageTk.PhotoImage(new_image)
-        self.next_cvs.create_image((0,0), image=self._next_im)
+        self.next_cvs.create_image(self._next_im_center, image=self._next_im)
 
     def update_hold(self, new_image):
         """Update the image in the hold canvas.
@@ -235,7 +262,7 @@ class App:
         self.hold_cvs.delete('all')
 
         self._hold_im = PIL.ImageTk.PhotoImage(new_image)
-        self.hold_cvs.create_image((0,0), image=self._hold_im)
+        self.hold_cvs.create_image(self._hold_im_center, image=self._hold_im)
 
 class Game:
     """The main object of the program. Keeps track of a 10x20 grid where the game is played. Contains functions for rendering, piece movement, and coordincate checking. Hosts the App object.
@@ -247,7 +274,7 @@ class Game:
     current : Piece-like
         The current piece falling.
     gamefield : list
-        A 10x23 list describing the placement of all current Blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
+        A 10x23 list describing the placement of all current blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
     hold : Piece-like
         Variable to hold held piece to be swapped out on command.
     lower_loop : Lower_Piece_Thread
@@ -269,7 +296,7 @@ class Game:
         print('TO DO: Game.Lower_Piece_Thread')
         self.speed = Constants.START_SPEED
 
-        self.piece_buffer = self.Piece_Buffer()
+        self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
         self.hold = None
 
@@ -289,12 +316,21 @@ class Game:
             A 5 element list describing the coming squence of pieces.
         """
 
-        def __init__(self):
-            """Initialize the pieces list and generate the initial pieces."""
+        def __init__(self, app):
+            """Initialize the pieces list and generate the initial pieces.
+
+            Parameters
+            ----------
+            app : App
+                The app instance being used in the game instance. Needed for update_cvs to update the next canvas in the tk app.
+            """
             self.pieces = []
+            self.app = app
 
             for i in range(5):
                 self.gen_new_piece()
+
+            self.update_cvs()
 
         def gen_new_piece(self):
             """Creates a random tetris piece and appends it to the pieces list.
@@ -321,8 +357,27 @@ class Game:
 
         def update_cvs(self):
             """Update the image in the next canvas on the tk application."""
-            print('TO DO: Game.Piece_Buffer.update_cvs')
+            global PIL
+            global Constants
+            global Palette
 
+            sizex = 4 * Constants.BLOCK_SIZE
+            # 14 is 2 lines for each Piece with a gap between each
+            sizey = 14 * Constants.BLOCK_SIZE
+
+            im = PIL.Image.new('RGB', (sizex, sizey), Palette.BLANK)
+
+            y = 0
+            for i, p in enumerate(self.pieces):
+                height = y + (2 * Constants.BLOCK_SIZE)
+
+                box = (0, y, sizex, height)
+                im.paste(p.profile.copy(), box)
+
+                # Add gap between profiles
+                y = height + Constants.BLOCK_SIZE
+
+            self.app.update_next(im)
 
         def __str__(self):
             """Creates a string representation of the coming pieces for debugging."""
@@ -341,18 +396,22 @@ class Piece:
     ---------------
     color : int tuple
         A 3 element list with 0 to 255 range decribing the rbg color to be shown when Blocks are rendered.
+    profile : PIL.Image
+        An image of the piece on it's side to be used in hold and next images.
     _init_orient : bool list
         A 4 by 4 list of booleans describing the relative positions of all Blocks in the initial orientation.
 
     Instance variables
     ------------------
     orientation : bool list
-        A 4 by 4 list of booleans describing the relative positions of all Blocks.
+        A 4 by 4 list of booleans describing the relative positions of all blocks.
     """
     global Palette
 
     _init_orient = [[False for x in range(4)] for y in range(4)]
     color = Palette.BLANK
+
+    profile = None
 
     def __init__(self, orientation=None):
         """Initializes the orientation and color variables.
@@ -446,22 +505,22 @@ class Piece:
         return orient
 
 
-    def __iter__(self):
+    def get_blocks(self):
         """Creates Block objects representing the current orientation.
 
         Cycles through the orientation grid and where True, creates a Block object and puts it in a list to iterate.
 
         Returns
         -------
-        Block list
-            Returns list of Block objects making up the Piece.
+        list
+            Returns a 4 by 4 grid with None in empty spots and a Palette color in place of where blocks would be.
         """
-        blocks = []
+        blocks = [[None for x in range(4)] for y in range(2)]
 
         for y, row in enumerate(self.orientation):
             for x, block in enumerate(row):
                 if block:
-                    blocks.append(self.Block(self.color, y, x))
+                    blocks[y][x] = self.color
 
         return blocks
 
@@ -474,41 +533,6 @@ class Piece:
 
         return fin
 
-    class Block:
-        """The individual blocks that make up a tetris piece.
-
-        Primarily used to store the color value of the origional Piece object after it has been placed.
-
-        Instance variables
-        ------------------
-        color : int tuple
-            A 3 element list with 0 to 255 range decribing the rbg color to be shown when rendered.
-        offset : int tuple
-            A 2 element list describing the Blocks offset from the top left of the Piece's orientation grid. Y offset first, X offset second.
-        """
-
-        def __init__(self, color, y_offset=0, x_offset=0):
-            """Initializes the color and xy_offset variables.
-
-            Parameters
-            ----------
-            color : int tuple
-                A 3 element list with 0 to 255 range decribing the rbg color to be shown when rendered.
-            x_offset : int (default = 0)
-                The x offset from the top left of the Piece's orientation grid.
-            y_offset : int (default = 0)
-                The y offset from the top left of the Piece's orientation grid.
-            """
-            self.color = color
-            self.offset = (y_offset, x_offset)
-
-        def __str__(self):
-            """Creates a string representation of the Block for debugging."""
-            color = 'Color: ' + str(self.color) + '\n'
-            offset = '+' + self.offset[0] + ', +' + self.offset[1]
-
-            return color + offset
-
 class I_Piece(Piece):
 
     _init_orient = [
@@ -518,6 +542,15 @@ class I_Piece(Piece):
         [True, False, False, False]
     ]
     color = Palette.I
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        p = self.rotate_cw()
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(p.get_blocks()[:2], False)
 class J_Piece(Piece):
 
     _init_orient = [
@@ -527,6 +560,15 @@ class J_Piece(Piece):
         [False, False, False, False]
     ]
     color = Palette.J
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        p = self.rotate_cw()
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(p.get_blocks()[:2], False)
 class L_Piece(Piece):
 
     _init_orient = [
@@ -536,6 +578,15 @@ class L_Piece(Piece):
         [False, False, False, False]
     ]
     color = Palette.L
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        p = self.rotate_ccw()
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(p.get_blocks()[:2], False)
 class S_Piece(Piece):
 
     _init_orient = [
@@ -545,6 +596,13 @@ class S_Piece(Piece):
         [False, False, False, False]
     ]
     color = Palette.S
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(self.get_blocks()[:2], False)
 class Z_Piece(Piece):
 
     _init_orient = [
@@ -554,6 +612,13 @@ class Z_Piece(Piece):
         [False, False, False, False]
     ]
     color = Palette.Z
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(self.get_blocks()[:2], False)
 class O_Piece(Piece):
 
     _init_orient = [
@@ -570,6 +635,13 @@ class O_Piece(Piece):
     def rotate_ccw(self):
         """Overrides Piece.rotate_cw. Returns self to avoid issues."""
         return self
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(self.get_blocks()[:2], False)
 class T_Piece(Piece):
 
     _init_orient = [
@@ -580,22 +652,30 @@ class T_Piece(Piece):
     ]
     color = Palette.T
 
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        # After rotation, the block should be oriented to fit in a 2 by 4 image.
+        self.__class__.profile = render(self.get_blocks()[:2], False)
+
 PIECES = (I_Piece, J_Piece, L_Piece, S_Piece, Z_Piece, O_Piece, T_Piece)
 
 
 if __name__ == '__main__':
+    init()
     game = Game()
 
-    for p in PIECES:
-        print(f'*** Piece: {p}')
-        print()
-
-        x = p()
-        print(x)
-
-        for i in range(4):
-            x = x.rotate_ccw()
-            print(x)
+    # for p in PIECES:
+    #     print(f'*** Piece: {p}')
+    #     print()
+    #
+    #     x = p()
+    #     print(x)
+    #
+    #     for i in range(4):
+    #         x = x.rotate_ccw()
+    #         print(x)
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
-    # input('Enter to quit: ')
+    input('Enter to quit: ')
