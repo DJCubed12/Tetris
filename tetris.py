@@ -278,7 +278,7 @@ class Game:
         The current piece falling.
     gamefield : list
         A 10x23 list describing the placement of all current blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
-    hold : Piece-like
+    held : Piece-like
         Variable to hold held piece to be swapped out on command.
     lower_loop : Lower_Piece_Thread
         Object that controls the thread for automatically dropping pieces.
@@ -286,6 +286,8 @@ class Game:
         Iterator giving next pieces.
     speed : int
         Current speed in milliseconds. Pieces automatically fall at this speed.
+    _already_held : bool
+        Becomes true when the user holds a piece (calls hold). If True, this prevents the user to hold again until the next piece.
     """
 
     def __init__(self):
@@ -301,7 +303,7 @@ class Game:
 
         self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
-        self.hold = None
+        self.held = None
 
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
         self.gamefield = [[None for x in range(10)] for y in range(23)]
@@ -309,6 +311,40 @@ class Game:
         # Show instructions and then play
         self.app.get_ready()
         # self.start()
+
+    def hold(self):
+        """Swap out the Piece in the current and hold variables. Event binding for hold button.
+
+        If hold is None (first held piece), save current Piece to it and replace current with the next Piece. Change the piece position to the top. Update hold canvas and
+        """
+        global PIL
+        global Constants
+        global Palette
+
+        # If this is the first held piece
+        if self.held is None:
+            self.held = self.current
+            self.current = next(self.piece_buffer)
+        # Prevent user from holding again before next piece
+        elif self._already_held:
+            return None
+        else:
+            new_hold = self.current
+            self.current = self.held
+            self.held = new_hold
+
+        self._already_held = True
+        print('TO DO: Game.hold must reset piece position to top')
+
+        # Update hold canvas
+        size = 4 * Constants.BLOCK_SIZE
+        im = PIL.Image.new('RGB', (size, size), Palette.BLANK)
+
+        box = (0, Constants.BLOCK_SIZE, size, size - Constants.BLOCK_SIZE)
+        im.paste(self.held.profile, box)
+
+        self.app.update_hold(im)
+
 
     class Piece_Buffer:
         """Iterator object that generates tetris pieces. Always keeps 5 pieces.
@@ -669,9 +705,15 @@ if __name__ == '__main__':
     init()
     game = Game()
 
-    while 'q' not in input('Enter q for quit: '):
-        p = next(game.piece_buffer)
-        print(p)
+    game.current = next(game.piece_buffer)
+    while 'q' not in input('Any to Hold, Q to Quit: '):
+        game.hold()
+        game._already_held = False
+
+    # Game.Piece_Buffer test
+    # while 'q' not in input('Enter q for quit: '):
+    #     p = next(game.piece_buffer)
+    #     print(p)
 
     # Piece rotation testing
     # for p in PIECES:
