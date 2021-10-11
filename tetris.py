@@ -35,11 +35,14 @@ class Constants:
     BLOCK_SIZE = GAME_WIDTH // 10
 
 class Palette:
-    """Contains the specific RGB tuples used for colors in the program. (Treated as an enum but not actually one because it conflicts with PIL)"""
+    """Contains the specific RGB tuples used for colors in the program. (Treated as an enum but not actually one because it conflicts with PIL)
+
+    Colors obtained from https://colorswall.com/palette/90259/.
+    """
     BLANK = (127, 127, 127)
     I = (0, 255, 255)
     J = (0, 0, 255)
-    L = (255, 0, 0)
+    L = (255, 127, 0)
     S = (0, 255, 0)
     Z = (255, 0, 0)
     O = (255, 255, 0)
@@ -666,6 +669,11 @@ if __name__ == '__main__':
     init()
     game = Game()
 
+    while 'q' not in input('Enter q for quit: '):
+        p = next(game.piece_buffer)
+        print(p)
+
+    # Piece rotation testing
     # for p in PIECES:
     #     print(f'*** Piece: {p}')
     #     print()
@@ -678,4 +686,4 @@ if __name__ == '__main__':
     #         print(x)
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
-    input('Enter to quit: ')
+    # input('Enter to quit: ')
