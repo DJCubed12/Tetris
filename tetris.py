@@ -385,6 +385,23 @@ class Game:
 
         self.update_cvs()
 
+    def hard_drop(self):
+        """Drops the piece as far as possible and places it there (using make_permanent)."""
+        new_coord = self.current_coord
+        all_clear = True
+        while all_clear:
+            new_coord[0] += 1
+            all_clear = self.check_move(self.current, new_coord)
+            # If that drop was not allowed, loop will be dropped
+
+        # Undo that last drop (it was not allowed)
+        new_coord[0] -= 1
+        self.current_coord = new_coord
+
+        print('TO DO: Game.hard_drop calls Game.make_permanent')
+        # make_permanent should call update_cvs, no need for it here
+        self.update_cvs()
+
     def right(self):
         """Moves the piece right if allowed by check_move, otherwise, make_permanent."""
         new_coord = [self.current_coord[0], self.current_coord[1] + 1]
@@ -399,12 +416,8 @@ class Game:
 
     def left(self):
         """Moves the piece left if allowed by check_move, otherwise, make_permanent."""
-        new_x = self.current_coord[1] - 1
-        if new_x >= 0:
-            new_coord = [self.current_coord[0], new_x]
-            all_clear = self.check_move(self.current, new_coord)
-        else:
-            all_clear = False
+        new_coord = [self.current_coord[0], self.current_coord[1] - 1]
+        all_clear = self.check_move(self.current, new_coord)
 
         if all_clear:
             self.current_coord = new_coord
@@ -455,14 +468,15 @@ class Game:
                 False if the new position would hit a pre-existing block, otherwise True.
             """
             for relative_y, row in enumerate(new_piece.get_blocks()):
-                # Since coords are from bottm left, the first y is 3 above new_coord (when relative_y = 4, it's the row at new_coord[0])
                 y = relative_y + new_coord[0]
-
                 for relative_x, block in enumerate(row):
-                    x = relative_x + new_coord[1]
-
                     # If the piece has a block in this part of its orientation grid. If not, no point of checking (empty space).
                     if block:
+                        x = relative_x + new_coord[1]
+                        if x < 0:
+                            # Block is outside the left wall. Must check because python will interpret [-1] differently
+                            return False
+
                         try:
                             # If this block is outside the bounds of the gamefield, IndexError is raised.
                             if self.gamefield[y][x] is not None:
@@ -474,6 +488,26 @@ class Game:
 
             # No conflict detected, movement is ok
             return True
+
+    def make_permanent(self):
+        """Permanently places the current piece at it's current position, checks for lines completed, and gets next piece.
+
+
+        """
+        for relative_y, row in enumerate(self.current.get_blocks()):
+            y = relative_y + self.current_coord[0]
+            for relative_x, block in enumerate(row):
+                if block:
+                    x = self.current_coord[1] + relative_x
+                    # Place block
+                    self.gamefield[y][x] = self.current.color
+
+        self.current = next(self.piece_buffer)
+        self.current_coord = [3, 3]
+
+        print('TO DO: Game.make_permanent check for lines')
+
+        self.update_cvs()
 
 
     def update_cvs(self):
@@ -848,31 +882,34 @@ def freeze_test(game):
     """
     game.current = next(game.piece_buffer)
 
-    print('z for quit, h for hold, s for down, w for up, a for left, d for right, q for ccw rotate, e for cw rotate.\n')
+    print('z for quit, 2 for place, r for hold, s for down, f for hard drop, w for up, a for left, d for right, q for ccw rotate, e for cw rotate.\n')
 
     while True:
         inp = input(' - ')
 
         if 'z' in inp:
             break
-        elif 'h' in inp:
+        elif 'r' in inp:
             game.hold()
             game._already_held = False
         elif 'w' in inp:
             game.current_coord[0] -= 1
+            game.update_cvs()
         elif 's' in inp:
             game.down()
         elif 'a' in inp:
             game.left()
+            print(game.current)
         elif 'd' in inp:
             game.right()
         elif 'q' in inp:
             game.rotate_ccw()
         elif 'e' in inp:
             game.rotate_cw()
-
-        game.update_cvs()
-
+        elif 'f' in inp:
+            game.hard_drop()
+        elif '2' in inp:
+            game.make_permanent()
 
 if __name__ == '__main__':
     init()
@@ -882,3 +919,4 @@ if __name__ == '__main__':
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
     # input('Enter to quit: ')
+    game.app.root.destroy()
