@@ -327,12 +327,6 @@ class Game:
         self.current_coord = [3, 3]    # y, x
         self.held = None
 
-        # DEBUG
-        print('DEBUG: Game.__init__')
-        global Palette
-        self.gamefield[3][0] = Palette.I
-        self.gamefield[13][5] = Palette.I
-
         # Show instructions and then play
         self.app.get_ready()
         # self.start()
@@ -381,7 +375,7 @@ class Game:
         if all_clear:
             self.current_coord = new_coord
         else:
-            print('MOVE DOWN NOT ALLOWED: Write Game.make_permanent')
+            self.make_permanent()
 
         self.update_cvs()
 
@@ -398,8 +392,8 @@ class Game:
         new_coord[0] -= 1
         self.current_coord = new_coord
 
-        print('TO DO: Game.hard_drop calls Game.make_permanent')
-        # make_permanent should call update_cvs, no need for it here
+        self.make_permanent()
+
         self.update_cvs()
 
     def right(self):
@@ -492,7 +486,7 @@ class Game:
     def make_permanent(self):
         """Permanently places the current piece at it's current position, checks for lines completed, and gets next piece.
 
-
+        Goes through the current piece's blocks and sets their corresponding place in the gamefield to the piece's color. Then the current piece is the next piece in the Piece Buffer and the current coordinate is reset. Then checks for and clears lines completed using check_lines and finally updates the canvas.
         """
         for relative_y, row in enumerate(self.current.get_blocks()):
             y = relative_y + self.current_coord[0]
@@ -505,9 +499,33 @@ class Game:
         self.current = next(self.piece_buffer)
         self.current_coord = [3, 3]
 
-        print('TO DO: Game.make_permanent check for lines')
+        self.check_lines()
 
         self.update_cvs()
+
+
+    def check_lines(self):
+        """Finds completed lines, clears them, moves everything down accordingly, and updates the score.
+
+        Checks each line of the gamefield from the bottom up. If any lines were completed, they are deleted and a new empty line is added to the top of the gamefield, shuffling everything down. Updates score and speed accordingly.
+        """
+        # lines is a log of the index of completed lines
+        lines = []
+        for y, row in enumerate(self.gamefield):
+            for block in row:
+                if not block:
+                    # There is a gap, stop checking this row, move on
+                    break
+            else:
+                # No gap detected, this is a complete line
+                lines.append(y)
+
+        for line in lines:
+            del self.gamefield[line]
+            self.gamefield.insert(0, [None for x in range(10)])
+
+        print('TO DO: Game.check_lines update score and speed')
+        # Use len(lines) for scoring
 
 
     def update_cvs(self):
@@ -899,7 +917,6 @@ def freeze_test(game):
             game.down()
         elif 'a' in inp:
             game.left()
-            print(game.current)
         elif 'd' in inp:
             game.right()
         elif 'q' in inp:
