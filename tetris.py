@@ -58,7 +58,6 @@ def init():
     for p in PIECES:
         p().gen_profile()
 
-# render will place Palette colors according to any pieces in the field
 def render(field, piece=None, piece_coord=None):
     """Converts the list field to a PIL.ImageTk.PhotoImage object and returns it.
 
@@ -97,10 +96,11 @@ def render(field, piece=None, piece_coord=None):
 
     if piece:
         for relative_y, row in enumerate(piece.get_blocks()):
+            # Since coords are from bottm left, the first y is 3 above the piece_coord (when relative_y = 4, it's the row at piece_coord[0])
+            y = relative_y - 3 + piece_coord[0]
+
             for relative_x, block in enumerate(row):
                 if block:
-                    # Since coords are from bottm left, the first y is 3 above the piece_coord (when relative_y = 4, it's the row at piece_coord[0])
-                    y = relative_y - 3 + piece_coord[0]
                     x = relative_x + piece_coord[1]
 
                     # If that block falls off the edge, don't draw it
@@ -293,7 +293,7 @@ class Game:
     current : Piece-like
         The current piece falling.
     current_coord : int list
-        The y, x coordinate of where the bottom left corner of the current Piece is on the gamefield.
+        The y, x coordinate of where the bottom left corner of the current Piece is on the gamefield. Next Pieces should start at [3, 3]
     gamefield : list
         A 10x23 list describing the placement of all current blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
     held : Piece-like
@@ -315,6 +315,9 @@ class Game:
 
         self.app = App()
 
+        # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
+        self.gamefield = [[None for x in range(10)] for y in range(23)]
+
         # self.lower_loop = self.Lower_Piece_Thread()
         print('TO DO: Game.Lower_Piece_Thread')
         self.speed = Constants.START_SPEED
@@ -324,12 +327,16 @@ class Game:
         self.current_coord = [3, 3]    # y, x
         self.held = None
 
-        # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
-        self.gamefield = [[None for x in range(10)] for y in range(23)]
+        # DEBUG
+        print('DEBUG: Game.__init__')
+        global Palette
+        self.gamefield[3][0] = Palette.I
+        self.gamefield[13][5] = Palette.I
 
         # Show instructions and then play
         self.app.get_ready()
         # self.start()
+
 
     def hold(self):
         """Swap out the Piece in the current and hold variables. Event binding for hold button.
@@ -353,7 +360,7 @@ class Game:
             self.held = new_hold
 
         self._already_held = True
-        print('TO DO: Game.hold must reset piece position to top')
+        self.current_coord = [3, 3]
 
         # Update hold canvas
         size = 4 * Constants.BLOCK_SIZE
@@ -363,6 +370,111 @@ class Game:
         im.paste(self.held.profile, box)
 
         self.app.update_hold(im)
+        self.update_cvs()
+
+
+    def down(self):
+        """Moves the piece down if allowed by check_move, otherwise, make_permanent."""
+        new_coord = [self.current_coord[0] + 1, self.current_coord[1]]
+        all_clear = self.check_move(self.current, new_coord)
+
+        if all_clear:
+            self.current_coord = new_coord
+        else:
+            print('MOVE DOWN NOT ALLOWED: Write Game.make_permanent')
+
+        self.update_cvs()
+
+    def right(self):
+        """Moves the piece right if allowed by check_move, otherwise, make_permanent."""
+        new_coord = [self.current_coord[0], self.current_coord[1] + 1]
+        all_clear = self.check_move(self.current, new_coord)
+
+        if all_clear:
+            self.current_coord = new_coord
+        else:
+            print('MOVE RIGHT NOT ALLOWED')
+
+        self.update_cvs()
+
+    def left(self):
+        """Moves the piece left if allowed by check_move, otherwise, make_permanent."""
+        new_x = self.current_coord[1] - 1
+        if new_x >= 0:
+            new_coord = [self.current_coord[0], new_x]
+            all_clear = self.check_move(self.current, new_coord)
+        else:
+            all_clear = False
+
+        if all_clear:
+            self.current_coord = new_coord
+        else:
+            print('MOVE LEFT NOT ALLOWED')
+
+        self.update_cvs()
+
+    def rotate_cw(self):
+        """Rotates the piece clockwise if allowed by check_move, otherwise, make_permanent."""
+        new_orient = self.current.rotate_cw()
+        all_clear = self.check_move(new_orient, self.current_coord)
+
+        if all_clear:
+            self.current = new_orient
+        else:
+            print('CW ROTATE NOT ALLOWED')
+
+        self.update_cvs()
+
+    def rotate_ccw(self):
+        """Rotates the piece counter-clockwise if allowed by check_move, otherwise, make_permanent."""
+        new_orient = self.current.rotate_ccw()
+        all_clear = self.check_move(new_orient, self.current_coord)
+
+        if all_clear:
+            self.current = new_orient
+        else:
+            print('CCW ROTATE NOT ALLOWED')
+
+        self.update_cvs()
+
+    def check_move(self, new_piece, new_coord):
+            """Checks to see if the new position will conflict with the current gamefield. If so return True.
+
+            Checks for when the block of a piece has the same coord as an existing block in the gamefield. Also checks for if a block of the piece would be outside the bounds of the gamefield.
+
+            Parameters
+            ----------
+            new_piece : Piece-like
+                The Piece being tested at position new_coord.
+            new_coord : int list
+                The new y, x coordinate of the bottom left corner of new_piece's orientation grid.
+
+            Returns
+            -------
+            bool
+                False if the new position would hit a pre-existing block, otherwise True.
+            """
+            for relative_y, row in enumerate(new_piece.get_blocks()):
+                # Since coords are from bottm left, the first y is 3 above new_coord (when relative_y = 4, it's the row at new_coord[0])
+                y = relative_y + new_coord[0]
+
+                for relative_x, block in enumerate(row):
+                    x = relative_x + new_coord[1]
+
+                    # If the piece has a block in this part of its orientation grid. If not, no point of checking (empty space).
+                    if block:
+                        try:
+                            # If this block is outside the bounds of the gamefield, IndexError is raised.
+                            if self.gamefield[y][x] is not None:
+                                # There's a block on the gamefield here, this is a conflict.
+                                return False
+                        except IndexError:
+                            # Block is outside the gamefield, this is a conflict.
+                            return False
+
+            # No conflict detected, movement is ok
+            return True
+
 
     def update_cvs(self):
         """Update the image of the gamefield in the tk application."""
@@ -749,15 +861,15 @@ def freeze_test(game):
         elif 'w' in inp:
             game.current_coord[0] -= 1
         elif 's' in inp:
-            game.current_coord[0] += 1
+            game.down()
         elif 'a' in inp:
-            game.current_coord[1] -= 1
+            game.left()
         elif 'd' in inp:
-            game.current_coord[1] += 1
+            game.right()
         elif 'q' in inp:
-            game.current = game.current.rotate_ccw()
+            game.rotate_ccw()
         elif 'e' in inp:
-            game.current = game.current.rotate_cw()
+            game.rotate_cw()
 
         game.update_cvs()
 
