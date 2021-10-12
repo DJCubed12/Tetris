@@ -59,8 +59,7 @@ def init():
         p().gen_profile()
 
 # render will place Palette colors according to any pieces in the field
-
-def render(field, return_tk_image=True):
+def render(field, piece=None, piece_coord=None):
     """Converts the list field to a PIL.ImageTk.PhotoImage object and returns it.
 
     Creates a blank image with size GAME_SIZE. Then iterates through the entire list, placing squares on the image with the appropiate color with the size BLOCK_SIZE. If element is None, it becomes an blank square. If Block, a square with the block's color is used. There SHOULD BE NO Pieces in list, they should be preformated to be Blocks.
@@ -69,15 +68,15 @@ def render(field, return_tk_image=True):
     ----------
     field : list
         A 2 dimensional list containing None and/or Palette colors to be converted to an image.
-    return_tk_image : bool (default = True)
-        Determines if the image returned should be a PIL.ImageTk.PhotoImage or a regular PIL.Image. For PIL.ImageTk.PhotoImage, use True.
+    piece : Piece-like (default = None)
+        A Piece that should be displayed over the field. Used to display the current piece over gamefield without changing the gamefield itself. If used, piece_coord must also be given. Ignored if None.
+    piece_coord : int tuple (default = None)
+        The y, x coordinate of where the bottom left corner of piece will be displayed over the field. If used, piece must also be given. Ignored if None.
 
     Returns
     -------
-    PIL.ImageTk.PhotoImage
-        Image of field to be displayed in a tk.canvas.
     PIL.Image
-        Image of field to be stitched with other images.
+        Image of field.
     """
     global Constants
     global BLANK_SQUARE
@@ -96,8 +95,25 @@ def render(field, return_tk_image=True):
                 # block is a Palette color
                 im.paste(block, box)
 
-    if return_tk_image:
-        im = PIL.ImageTk.PhotoImage(im)
+    if piece:
+        for relative_y, row in enumerate(piece.get_blocks()):
+            for relative_x, block in enumerate(row):
+                if block:
+                    # Since coords are from bottm left, the first y is 3 above the piece_coord (when relative_y = 4, it's the row at piece_coord[0])
+                    y = relative_y - 3 + piece_coord[0]
+                    x = relative_x + piece_coord[1]
+
+                    # If that block falls off the edge, don't draw it
+                    try:
+                        field[y][x]
+                    except IndexError:
+                        continue
+
+                    box = (x * Constants.BLOCK_SIZE, y * Constants.BLOCK_SIZE, (x+1) * Constants.BLOCK_SIZE, (y+1) * Constants.BLOCK_SIZE)
+
+                    # block is a Palette color
+                    im.paste(piece.color, box)
+
     return im
 
 class App:
@@ -276,6 +292,8 @@ class Game:
         The Tk application that interfaces the game to the user.
     current : Piece-like
         The current piece falling.
+    current_coord : int list
+        The y, x coordinate of where the bottom left corner of the current Piece is on the gamefield.
     gamefield : list
         A 10x23 list describing the placement of all current blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
     held : Piece-like
@@ -303,6 +321,7 @@ class Game:
 
         self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
+        self.current_coord = [3, 3]    # y, x
         self.held = None
 
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
@@ -345,6 +364,12 @@ class Game:
 
         self.app.update_hold(im)
 
+    def update_cvs(self):
+        """Update the image of the gamefield in the tk application."""
+        global render
+
+        im = render(self.gamefield[3:], self.current, self.current_coord)
+        self.app.update_game(im)
 
     class Piece_Buffer:
         """Iterator object that generates tetris pieces. Always keeps 5 pieces.
@@ -554,7 +579,7 @@ class Piece:
         list
             Returns a 4 by 4 grid with None in empty spots and a Palette color in place of where blocks would be.
         """
-        blocks = [[None for x in range(4)] for y in range(2)]
+        blocks = [[None for x in range(4)] for y in range(4)]
 
         for y, row in enumerate(self.orientation):
             for x, block in enumerate(row):
@@ -589,7 +614,7 @@ class I_Piece(Piece):
         p = self.rotate_cw()
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(p.get_blocks()[:2], False)
+        self.__class__.profile = render(p.get_blocks()[:2])
 class J_Piece(Piece):
 
     _init_orient = [
@@ -607,7 +632,7 @@ class J_Piece(Piece):
         p = self.rotate_cw()
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(p.get_blocks()[:2], False)
+        self.__class__.profile = render(p.get_blocks()[:2])
 class L_Piece(Piece):
 
     _init_orient = [
@@ -625,7 +650,7 @@ class L_Piece(Piece):
         p = self.rotate_ccw()
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(p.get_blocks()[:2], False)
+        self.__class__.profile = render(p.get_blocks()[:2])
 class S_Piece(Piece):
 
     _init_orient = [
@@ -641,7 +666,7 @@ class S_Piece(Piece):
         global render
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2], False)
+        self.__class__.profile = render(self.get_blocks()[:2])
 class Z_Piece(Piece):
 
     _init_orient = [
@@ -657,7 +682,7 @@ class Z_Piece(Piece):
         global render
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2], False)
+        self.__class__.profile = render(self.get_blocks()[:2])
 class O_Piece(Piece):
 
     _init_orient = [
@@ -680,7 +705,7 @@ class O_Piece(Piece):
         global render
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2], False)
+        self.__class__.profile = render(self.get_blocks()[:2])
 class T_Piece(Piece):
 
     _init_orient = [
@@ -696,36 +721,52 @@ class T_Piece(Piece):
         global render
 
         # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2], False)
+        self.__class__.profile = render(self.get_blocks()[:2])
 
 PIECES = (I_Piece, J_Piece, L_Piece, S_Piece, Z_Piece, O_Piece, T_Piece)
+
+
+def freeze_test(game):
+    """Uses console input to move control movement manually.
+
+    Parameters
+    ----------
+    game : Game
+        The instance of Game being played.
+    """
+    game.current = next(game.piece_buffer)
+
+    print('z for quit, h for hold, s for down, w for up, a for left, d for right, q for ccw rotate, e for cw rotate.\n')
+
+    while True:
+        inp = input(' - ')
+
+        if 'z' in inp:
+            break
+        elif 'h' in inp:
+            game.hold()
+            game._already_held = False
+        elif 'w' in inp:
+            game.current_coord[0] -= 1
+        elif 's' in inp:
+            game.current_coord[0] += 1
+        elif 'a' in inp:
+            game.current_coord[1] -= 1
+        elif 'd' in inp:
+            game.current_coord[1] += 1
+        elif 'q' in inp:
+            game.current = game.current.rotate_ccw()
+        elif 'e' in inp:
+            game.current = game.current.rotate_cw()
+
+        game.update_cvs()
 
 
 if __name__ == '__main__':
     init()
     game = Game()
 
-    game.current = next(game.piece_buffer)
-    while 'q' not in input('Any to Hold, Q to Quit: '):
-        game.hold()
-        game._already_held = False
-
-    # Game.Piece_Buffer test
-    # while 'q' not in input('Enter q for quit: '):
-    #     p = next(game.piece_buffer)
-    #     print(p)
-
-    # Piece rotation testing
-    # for p in PIECES:
-    #     print(f'*** Piece: {p}')
-    #     print()
-    #
-    #     x = p()
-    #     print(x)
-    #
-    #     for i in range(4):
-    #         x = x.rotate_ccw()
-    #         print(x)
+    freeze_test(game)
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
     # input('Enter to quit: ')
