@@ -10,8 +10,14 @@ try:
 except:
     print('There was a problem setting DPI Awareness')
 
-import PIL.Image
-import PIL.ImageTk
+try:
+    import PIL.Image
+    import PIL.ImageTk
+except ModuleNotFoundError:
+    print('\n-----')
+    print("This program requires the Python library 'Pillow'. Use pip or pipenv install pillow to download the library (virtual environment is encouraged).")
+    print('-----')
+    exit()
 
 
 # CONSTANTS
@@ -21,9 +27,9 @@ class Constants:
     # In milliseconds:
     START_SPEED = 1.0
     # Multiplied by the speed
-    SPEED_STEP = 3 / 4
+    SPEED_STEP = 1 / 2
     # Lines to clear before speed changes
-    LINES_SPEED_STEP = 2
+    LINES_SPEED_STEP = 4
 
     # In pixels:
     # Should be divisible by 10
@@ -43,7 +49,19 @@ class Palette:
 
     Colors obtained from https://colorswall.com/palette/90259/.
     """
+
+    def _get_blank_hex(blank):
+        full = ''
+        for channel in blank:
+            val = hex(channel)[2:]
+            while len(val) < 2:
+                val = '0' + val
+            full += val
+        return full
+
     BLANK = (127, 127, 127)
+    BLANK_HEX = '#' + _get_blank_hex(BLANK)
+
     I = (0, 255, 255)
     J = (0, 0, 255)
     L = (255, 127, 0)
@@ -129,12 +147,12 @@ class App:
         Canvas for displaying the gamefield.
     hold_cvs : tk.Canvas
         Canvas for displaying held tetris pieces.
+    info_lbl : tk.Label
+        Label widget to display current score, speed, and lines completed.
     next_cvs : tk.Canvas
         Canvas for displaying incoming pieces (pieces in Game.Piece_Buffer).
     root : tk.Tk
         Root of the tk application.
-    score_lbl : tk.Label
-        Label widget to display current score.
     _game_im : PIL.ImageTk.PhotoImage
         Variable to hold game_cvs's displayed image in memory.
     _game_im_center : int tuple
@@ -165,10 +183,13 @@ class App:
         """
         global Constants, Palette
 
+        bg_color = Palette.BLANK_HEX
+
+
         self.root = tk.Tk()
         self.root.title('Tetris')
-        # DEBUG
-        self.root['bg'] = 'red'
+        # Appearance
+        self.root['bg'] = 'black'
 
 
         # HOLD CANVAS
@@ -179,8 +200,8 @@ class App:
         hold_size = Constants.BLOCK_SIZE * 4
         self.hold_cvs.config(width=hold_size, height=hold_size)
 
-        # DEBUG
-        self.hold_cvs['bg'] = 'blue'
+        # Appearance
+        self.hold_cvs['bg'] = bg_color
 
         # Init image
         # Position is the center of the image, hence the / 2
@@ -199,8 +220,8 @@ class App:
         game_sizey = Constants.GAME_SIZE[1]
         self.game_cvs.config(width=game_sizex, height=game_sizey)
 
-        # DEBUG
-        self.game_cvs['bg'] = 'orange'
+        # Appearance
+        self.game_cvs['bg'] = bg_color
 
         # Init image
         self._game_im_center = (game_sizex / 2, game_sizey / 2)
@@ -219,8 +240,8 @@ class App:
         next_sizey = 14 * Constants.BLOCK_SIZE
         self.next_cvs.config(width=next_sizex, height=next_sizey)
 
-        # DEBUG
-        self.next_cvs['bg'] = 'green'
+        # Appearance
+        self.next_cvs['bg'] = bg_color
 
         # Init image
         self._next_im_center = (next_sizex / 2, next_sizey / 2)
@@ -230,12 +251,13 @@ class App:
 
 
         # SCORE LABEL
-        self.score_lbl = tk.Label(self.root, text='Score:\n0')
-        self.score_lbl.grid(row=1, column=0, sticky='esw')
+        self.info_lbl = tk.Label(self.root, text='init text')
+        self.info_lbl.grid(row=1, column=0, sticky='esw')
 
 
         # FINAL SETTINGS
         # Disable window resizing
+        self.update_lbl(0, 0, Constants.START_SPEED)
         self.root.resizable(False, False)
         self.make_bindings(game)
 
@@ -329,6 +351,24 @@ class App:
         self._hold_im = PIL.ImageTk.PhotoImage(new_image)
         self.hold_cvs.create_image(self._hold_im_center, image=self._hold_im)
 
+    def update_lbl(self, score, lines, speed):
+        """Update the info label to reflect the new score, lines completed, and speed.
+
+        Parameters
+        ----------
+        score : int
+            The current score the user has.
+        lines : int
+            The total number of lines completed.
+        speed : int
+            The current speed.
+        """
+        new_score = f'Score:\n{score}\n'
+        new_lines = f'Lines:\n{lines}\n'
+        new_speed = f'Speed:\n{speed:.3f} s/b'
+
+        self.info_lbl['text'] = new_score + new_lines + new_speed
+
 class Game:
     """The main object of the program. Keeps track of a 10x20 grid where the game is played. Contains functions for rendering, piece movement, and coordincate checking. Hosts the App object.
 
@@ -346,6 +386,8 @@ class Game:
         A 10x23 list describing the placement of all current blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
     held : Piece-like
         Variable to hold held piece to be swapped out on command.
+    lines_complete : int
+        Total number of lines completed.
     piece_buffer : Piece_Buffer
         Iterator giving next pieces.
     score : int
@@ -371,6 +413,7 @@ class Game:
 
         self.score = 0
         self.speed = Constants.START_SPEED
+        self.lines_complete = 0
         self._lines_step_counter = Constants.LINES_SPEED_STEP
         self.drop_timer = RepeatedTimer(self.speed, self.down)
 
@@ -605,12 +648,13 @@ class Game:
             Number of lines that have been cleared.
         """
         self.score += 100 * lines
+        self.lines_complete += lines
         if lines == 4:
             self.score += 100
 
         print(f'DEBUG: score = {self.score}')
 
-        self._lines_step_counter -= 1
+        self._lines_step_counter -= lines
         if self._lines_step_counter == 0:
             global Constants
 
@@ -620,7 +664,7 @@ class Game:
 
             print(f'DEBUG: speed = {self.speed}')
 
-        print('TO DO: Game.score_manager update tk labels')
+        self.app.update_lbl(self.score, self.lines_complete, self.speed)
 
     def update_cvs(self):
         """Update the image of the gamefield in the tk application."""
