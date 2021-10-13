@@ -1,3 +1,4 @@
+import asyncio
 import tkinter as tk
 from random import choice
 from copy import deepcopy
@@ -97,7 +98,7 @@ def render(field, piece=None, piece_coord=None):
     if piece:
         for relative_y, row in enumerate(piece.get_blocks()):
             # Since coords are from bottm left, the first y is 3 above the piece_coord (when relative_y = 4, it's the row at piece_coord[0])
-            y = relative_y - 3 + piece_coord[0]
+            y = relative_y + piece_coord[0] - 3
 
             for relative_x, block in enumerate(row):
                 if block:
@@ -366,7 +367,7 @@ class Game:
 
         self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
-        self.current_coord = [3, 3]    # y, x
+        self.current_coord = [0, 3]    # y, x
         self.held = None
 
         # Show instructions and then play
@@ -381,6 +382,11 @@ class Game:
         self.update_cvs()
 
         self.app.run()
+
+    def lose(self):
+        print('TO DO: self.lose')
+        self.app.stop()
+        print(' * * *   G A M E   O V E R   * * *')
 
 
     def hold(self, event=None):
@@ -549,14 +555,13 @@ class Game:
                     self.gamefield[y][x] = self.current.color
 
         self.current = next(self.piece_buffer)
-        self.current_coord = [3, 3]
+        self.current_coord = [0, 3]
         # Allow hold button again
         self._already_held = False
 
         self.check_lines()
 
         self.update_cvs()
-
 
     def check_lines(self):
         """Finds completed lines, clears them, moves everything down accordingly, and updates the score.
@@ -565,7 +570,7 @@ class Game:
         """
         # lines is a log of the index of completed lines
         lines = []
-        for y, row in enumerate(self.gamefield):
+        for y, row in enumerate(self.gamefield[3:]):
             for block in row:
                 if not block:
                     # There is a gap, stop checking this row, move on
@@ -580,6 +585,11 @@ class Game:
 
         print('TO DO: Game.check_lines update score and speed')
         # Use len(lines) for scoring
+
+        # Check for loss after completing and clearing any lines
+        for block in self.gamefield[2]:
+            if block:
+                self.lose()
 
 
     def update_cvs(self):
