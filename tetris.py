@@ -146,8 +146,13 @@ class App:
     """
     global tk, PIL
 
-    def __init__(self):
+    def __init__(self, game):
         """Create the tkinter window in which the game is played.
+
+        Parameters
+        ----------
+        game: Game
+            The instance of game that is being played. Needed in order to bind events to the tk application.
 
         Returns
         -------
@@ -224,16 +229,53 @@ class App:
         self.score_lbl = tk.Label(self.root, text='Score:\n0')
         self.score_lbl.grid(row=1, column=0, sticky='esw')
 
+
+        # FINAL SETTINGS
+        # Disable window resizing
+        self.root.resizable(False, False)
+        self.make_bindings(game)
+
+    def make_bindings(self, game):
+        """Setup all event bindings needed in the program.
+
+        Parameters
+        ----------
+        game: Game
+            The instance of game that is being played. Needed in order to bind events to the tk application.
+        """
+        # def get_event_command(game_method):
+        #     """Wrapper function used to create an event command function."""
+        #     def func(event):
+        #         """Wrapper function used to call a method of game from an event binding."""
+        #         game_method()
+
+        self.root.bind_all('<s>', game.down)
+        self.root.bind_all('<space>', game.hard_drop)
+
+        self.root.bind_all('<a>', game.left)
+        self.root.bind_all('<d>', game.right)
+
+        self.root.bind_all('<q>', game.rotate_ccw)
+        self.root.bind_all('<e>', game.rotate_cw)
+
+        self.root.bind_all('<w>', game.hold)
+
+        self.root.bind_all('<z>', self.stop)
+
+        # self.bind_all('<Key-Print>', self.__printScreen)
+
+        print('TO DO: App.make_bindings')
+
+
     def get_ready(self):
         """Show a pop-up window with instructions and a start button."""
         print('TO DO: App.get_ready')
-
 
     def run(self):
         """Starts the main event loop for the tkinter application."""
         self.root.mainloop()
 
-    def stop(self):
+    def stop(self, event=None):
         """Stop the tk event loop."""
         self.root.quit()
 
@@ -313,7 +355,7 @@ class Game:
         global Constants
         global App
 
-        self.app = App()
+        self.app = App(self)
 
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
         self.gamefield = [[None for x in range(10)] for y in range(23)]
@@ -329,10 +371,19 @@ class Game:
 
         # Show instructions and then play
         self.app.get_ready()
-        # self.start()
+        self.start()
+
+    def start(self):
+        """Starts all event loops and creates the first piece."""
+
+        self.current = next(self.piece_buffer)
+
+        self.update_cvs()
+
+        self.app.run()
 
 
-    def hold(self):
+    def hold(self, event=None):
         """Swap out the Piece in the current and hold variables. Event binding for hold button.
 
         If hold is None (first held piece), save current Piece to it and replace current with the next Piece. Change the piece position to the top. Update hold canvas and
@@ -367,7 +418,7 @@ class Game:
         self.update_cvs()
 
 
-    def down(self):
+    def down(self, event=None):
         """Moves the piece down if allowed by check_move, otherwise, make_permanent."""
         new_coord = [self.current_coord[0] + 1, self.current_coord[1]]
         all_clear = self.check_move(self.current, new_coord)
@@ -379,7 +430,7 @@ class Game:
 
         self.update_cvs()
 
-    def hard_drop(self):
+    def hard_drop(self, event=None):
         """Drops the piece as far as possible and places it there (using make_permanent)."""
         new_coord = self.current_coord
         all_clear = True
@@ -396,7 +447,7 @@ class Game:
 
         self.update_cvs()
 
-    def right(self):
+    def right(self, event=None):
         """Moves the piece right if allowed by check_move, otherwise, make_permanent."""
         new_coord = [self.current_coord[0], self.current_coord[1] + 1]
         all_clear = self.check_move(self.current, new_coord)
@@ -408,7 +459,7 @@ class Game:
 
         self.update_cvs()
 
-    def left(self):
+    def left(self, event=None):
         """Moves the piece left if allowed by check_move, otherwise, make_permanent."""
         new_coord = [self.current_coord[0], self.current_coord[1] - 1]
         all_clear = self.check_move(self.current, new_coord)
@@ -420,7 +471,7 @@ class Game:
 
         self.update_cvs()
 
-    def rotate_cw(self):
+    def rotate_cw(self, event=None):
         """Rotates the piece clockwise if allowed by check_move, otherwise, make_permanent."""
         new_orient = self.current.rotate_cw()
         all_clear = self.check_move(new_orient, self.current_coord)
@@ -432,7 +483,7 @@ class Game:
 
         self.update_cvs()
 
-    def rotate_ccw(self):
+    def rotate_ccw(self, event=None):
         """Rotates the piece counter-clockwise if allowed by check_move, otherwise, make_permanent."""
         new_orient = self.current.rotate_ccw()
         all_clear = self.check_move(new_orient, self.current_coord)
@@ -443,6 +494,7 @@ class Game:
             print('CCW ROTATE NOT ALLOWED')
 
         self.update_cvs()
+
 
     def check_move(self, new_piece, new_coord):
             """Checks to see if the new position will conflict with the current gamefield. If so return True.
@@ -498,6 +550,8 @@ class Game:
 
         self.current = next(self.piece_buffer)
         self.current_coord = [3, 3]
+        # Allow hold button again
+        self._already_held = False
 
         self.check_lines()
 
@@ -932,7 +986,7 @@ if __name__ == '__main__':
     init()
     game = Game()
 
-    freeze_test(game)
+    # freeze_test(game)
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
     # input('Enter to quit: ')
