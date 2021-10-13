@@ -369,7 +369,7 @@ class Game:
 
         self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
-        self.current_coord = [3, 3]    # y, x
+        self.current_coord = [0, 3]    # y, x
         self.held = None
 
         self.score = 0
@@ -1042,4 +1042,5 @@ if __name__ == '__main__':
 
     # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
     # input('Enter to quit: ')
+    game.drop_timer.stop()
     game.app.root.destroy()
