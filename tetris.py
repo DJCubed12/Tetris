@@ -1,5 +1,5 @@
-import asyncio
 import tkinter as tk
+from threading import Timer
 from random import choice
 from copy import deepcopy
 
@@ -19,8 +19,8 @@ class Constants:
     """Enum of global constants. (Not actually an enum because it conflicts with PIL)"""
     # MANUALLY ADJUST
     # In milliseconds:
-    START_SPEED = 1500
-    SPEED_STEP = 250
+    START_SPEED = 1.25
+    SPEED_STEP = 0.1
 
     # In pixels:
     # Should be divisible by 10
@@ -261,7 +261,7 @@ class App:
 
         self.root.bind_all('<w>', game.hold)
 
-        self.root.bind_all('<z>', self.stop)
+        self.root.bind_all('<z>', game.lose)
 
         # self.bind_all('<Key-Print>', self.__printScreen)
 
@@ -336,15 +336,17 @@ class Game:
     current : Piece-like
         The current piece falling.
     current_coord : int list
-        The y, x coordinate of where the bottom left corner of the current Piece is on the gamefield. Next Pieces should start at [3, 3]
+        The y, x coordinate of where the bottom left corner of the current Piece is on the gamefield. Next Pieces should start at [0, 3].
+    drop_timer : RepeatedTimer
+        The Timer object that is ran in a different thread that calls drop_loop periodically.
     gamefield : list
         A 10x23 list describing the placement of all current blocks and the current Piece falling. The extra 3 top rows are for pieces to start in (not to be display).
     held : Piece-like
         Variable to hold held piece to be swapped out on command.
-    lower_loop : Lower_Piece_Thread
-        Object that controls the thread for automatically dropping pieces.
     piece_buffer : Piece_Buffer
         Iterator giving next pieces.
+    score : int
+        Score the user has earned.
     speed : int
         Current speed in milliseconds. Pieces automatically fall at this speed.
     _already_held : bool
@@ -353,6 +355,7 @@ class Game:
 
     def __init__(self):
         """Creates the App object. Initializes variables. Calls app.get_ready before starting the game."""
+        global RepeatedTimer
         global Constants
         global App
 
@@ -361,7 +364,6 @@ class Game:
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
         self.gamefield = [[None for x in range(10)] for y in range(23)]
 
-        # self.lower_loop = self.Lower_Piece_Thread()
         print('TO DO: Game.Lower_Piece_Thread')
         self.speed = Constants.START_SPEED
 
@@ -370,22 +372,31 @@ class Game:
         self.current_coord = [0, 3]    # y, x
         self.held = None
 
+        self.drop_timer = RepeatedTimer(self.speed, self.down)
+
+        self.score = 0
+
         # Show instructions and then play
         self.app.get_ready()
         self.start()
 
     def start(self):
-        """Starts all event loops and creates the first piece."""
+        """Starts all the drop loop and tk event loop and creates the first piece."""
 
         self.current = next(self.piece_buffer)
 
         self.update_cvs()
 
+        self.drop_timer.start()
+
         self.app.run()
 
-    def lose(self):
+    def lose(self, event=None):
         print('TO DO: self.lose')
+
+        self.drop_timer.stop()
         self.app.stop()
+
         print(' * * *   G A M E   O V E R   * * *')
 
 
@@ -422,7 +433,6 @@ class Game:
 
         self.app.update_hold(im)
         self.update_cvs()
-
 
     def down(self, event=None):
         """Moves the piece down if allowed by check_move, otherwise, make_permanent."""
@@ -579,12 +589,12 @@ class Game:
                 # No gap detected, this is a complete line
                 lines.append(y)
 
-        for line in lines:
-            del self.gamefield[line]
-            self.gamefield.insert(0, [None for x in range(10)])
+        if len(lines):
+            for line in lines:
+                del self.gamefield[line]
+                self.gamefield.insert(0, [None for x in range(10)])
 
-        print('TO DO: Game.check_lines update score and speed')
-        # Use len(lines) for scoring
+            print('TO DO: Game.check_lines update score and speed')
 
         # Check for loss after completing and clearing any lines
         for block in self.gamefield[2]:
@@ -679,6 +689,40 @@ class Game:
                 fin += p
 
             return fin
+
+
+class RepeatedTimer:
+    """Uses threading.Timer to repeatedly use another thread to call a function every interval seconds.
+
+    Stolen from https://www.py4u.net/discuss/10170 (Answer #3)
+    """
+    global Timer
+
+    def __init__(self, interval, function, *args, **kwargs):
+        self._timer     = None
+        self.interval   = interval
+        self.function   = function
+        self.args       = args
+        self.kwargs     = kwargs
+        self.is_running = False
+
+        # Auto-run:
+        # self.start()
+
+    def _run(self):
+        self.is_running = False
+        self.start()
+        self.function(*self.args, **self.kwargs)
+
+    def start(self):
+        if not self.is_running:
+            self._timer = Timer(self.interval, self._run)
+            self._timer.start()
+            self.is_running = True
+
+    def stop(self):
+        self._timer.cancel()
+        self.is_running = False
 
 
 class Piece:
