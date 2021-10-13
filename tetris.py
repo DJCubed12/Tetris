@@ -19,8 +19,11 @@ class Constants:
     """Enum of global constants. (Not actually an enum because it conflicts with PIL)"""
     # MANUALLY ADJUST
     # In milliseconds:
-    START_SPEED = 1.25
-    SPEED_STEP = 0.1
+    START_SPEED = 1.0
+    # Multiplied by the speed
+    SPEED_STEP = 3 / 4
+    # Lines to clear before speed changes
+    LINES_SPEED_STEP = 2
 
     # In pixels:
     # Should be divisible by 10
@@ -351,6 +354,8 @@ class Game:
         Current speed in milliseconds. Pieces automatically fall at this speed.
     _already_held : bool
         Becomes true when the user holds a piece (calls hold). If True, this prevents the user to hold again until the next piece.
+    _lines_step_counter : int
+        Number of lines left until speed changes. Resets to Constants.LINES_SPEED_STEP.
     """
 
     def __init__(self):
@@ -364,15 +369,15 @@ class Game:
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
         self.gamefield = [[None for x in range(10)] for y in range(23)]
 
+        self.score = 0
         self.speed = Constants.START_SPEED
+        self._lines_step_counter = Constants.LINES_SPEED_STEP
         self.drop_timer = RepeatedTimer(self.speed, self.down)
 
         self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
         self.current_coord = [0, 3]    # y, x
         self.held = None
-
-        self.score = 0
 
         # Show instructions and then play
         self.app.get_ready()
@@ -420,7 +425,7 @@ class Game:
             self.held = new_hold
 
         self._already_held = True
-        self.current_coord = [3, 3]
+        self.current_coord = [0, 3]
 
         # Update hold canvas
         size = 4 * Constants.BLOCK_SIZE
@@ -468,8 +473,6 @@ class Game:
 
         if all_clear:
             self.current_coord = new_coord
-        else:
-            print('MOVE RIGHT NOT ALLOWED')
 
         self.update_cvs()
 
@@ -480,8 +483,6 @@ class Game:
 
         if all_clear:
             self.current_coord = new_coord
-        else:
-            print('MOVE LEFT NOT ALLOWED')
 
         self.update_cvs()
 
@@ -492,8 +493,6 @@ class Game:
 
         if all_clear:
             self.current = new_orient
-        else:
-            print('CW ROTATE NOT ALLOWED')
 
         self.update_cvs()
 
@@ -504,8 +503,6 @@ class Game:
 
         if all_clear:
             self.current = new_orient
-        else:
-            print('CCW ROTATE NOT ALLOWED')
 
         self.update_cvs()
 
@@ -592,13 +589,38 @@ class Game:
                 del self.gamefield[line]
                 self.gamefield.insert(0, [None for x in range(10)])
 
-            print('TO DO: Game.check_lines update score and speed')
+            self.score_manager(len(lines))
 
         # Check for loss after completing and clearing any lines
         for block in self.gamefield[2]:
             if block:
                 self.lose()
 
+    def score_manager(self, lines):
+        """Manages the changes and additions to the user's score including updating the tk label and changing the speed.
+
+        Parameters
+        ----------
+        lines : int
+            Number of lines that have been cleared.
+        """
+        self.score += 100 * lines
+        if lines == 4:
+            self.score += 100
+
+        print(f'DEBUG: score = {self.score}')
+
+        self._lines_step_counter -= 1
+        if self._lines_step_counter == 0:
+            global Constants
+
+            self._lines_step_counter = Constants.LINES_SPEED_STEP
+            self.speed *= Constants.SPEED_STEP
+            self.drop_timer.interval = self.speed
+
+            print(f'DEBUG: speed = {self.speed}')
+
+        print('TO DO: Game.score_manager update tk labels')
 
     def update_cvs(self):
         """Update the image of the gamefield in the tk application."""
@@ -709,8 +731,11 @@ class RepeatedTimer:
 
     def _run(self):
         self.is_running = False
-        self.start()
-        self.function(*self.args, **self.kwargs)
+        try:
+            self.function(*self.args, **self.kwargs)
+            self.start()
+        except RuntimeError:
+            print('RUNETIME ERROR: Shutting down drop loop.')
 
     def start(self):
         if not self.is_running:
