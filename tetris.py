@@ -8,7 +8,7 @@ try:
     import ctypes
     ctypes.windll.shcore.SetProcessDpiAwareness(1)
 except:
-    pass
+    print('There was a problem setting DPI Awareness')
 
 import PIL.Image
 import PIL.ImageTk
@@ -364,15 +364,13 @@ class Game:
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
         self.gamefield = [[None for x in range(10)] for y in range(23)]
 
-        print('TO DO: Game.Lower_Piece_Thread')
         self.speed = Constants.START_SPEED
+        self.drop_timer = RepeatedTimer(self.speed, self.down)
 
         self.piece_buffer = self.Piece_Buffer(self.app)
         self.current = None
-        self.current_coord = [0, 3]    # y, x
+        self.current_coord = [3, 3]    # y, x
         self.held = None
-
-        self.drop_timer = RepeatedTimer(self.speed, self.down)
 
         self.score = 0
 
@@ -381,7 +379,7 @@ class Game:
         self.start()
 
     def start(self):
-        """Starts all the drop loop and tk event loop and creates the first piece."""
+        """Starts both the drop loop and tk event loop and creates the first piece."""
 
         self.current = next(self.piece_buffer)
 
@@ -580,7 +578,7 @@ class Game:
         """
         # lines is a log of the index of completed lines
         lines = []
-        for y, row in enumerate(self.gamefield[3:]):
+        for y, row in enumerate(self.gamefield):
             for block in row:
                 if not block:
                     # There is a gap, stop checking this row, move on
