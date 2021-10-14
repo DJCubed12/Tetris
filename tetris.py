@@ -269,11 +269,6 @@ class App:
         game: Game
             The instance of game that is being played. Needed in order to bind events to the tk application.
         """
-        # def get_event_command(game_method):
-        #     """Wrapper function used to create an event command function."""
-        #     def func(event):
-        #         """Wrapper function used to call a method of game from an event binding."""
-        #         game_method()
 
         self.root.bind_all('<s>', game.down)
         self.root.bind_all('<space>', game.hard_drop)
@@ -287,10 +282,6 @@ class App:
         self.root.bind_all('<w>', game.hold)
 
         self.root.bind_all('<z>', game.lose)
-
-        # self.bind_all('<Key-Print>', self.__printScreen)
-
-        print('TO DO: App.make_bindings')
 
 
     def get_ready(self):
@@ -433,7 +424,8 @@ class Game:
 
         self.update_cvs()
 
-        self.drop_timer.start()
+        print('DEBUG: Game.start drop loop off')
+        # self.drop_timer.start()
 
         self.app.run()
 
@@ -788,7 +780,11 @@ class RepeatedTimer:
             self.is_running = True
 
     def stop(self):
-        self._timer.cancel()
+        try:
+            self._timer.cancel()
+        except AttributeError:
+            # Timer was never created
+            pass
         self.is_running = False
 
 
@@ -803,18 +799,26 @@ class Piece:
         An image of the piece on it's side to be used in hold and next images.
     _init_orient : bool list
         A 4 by 4 list of booleans describing the relative positions of all Blocks in the initial orientation.
+    _rot_for_profile : bool
+        Tells if gen_profile should rotate before generating the profile. 1 for clockwise rotation, -1 for counter-clockwise, 0 for no rotation.
 
     Instance variables
     ------------------
     orientation : bool list
-        A 4 by 4 list of booleans describing the relative positions of all blocks.
+        A matrix of booleans describing the relative positions of all blocks.
+    _matrix_size : int
+        The size (same for x and y) of this piece's orient matrix.
     """
     global Palette
 
-    _init_orient = [[False for x in range(4)] for y in range(4)]
     color = Palette.BLANK
 
     profile = None
+    _rot_for_profile = 0
+
+    _init_orient = [[False for x in range(4)] for y in range(4)]
+
+    _empty_orient = lambda self: [[False for x in range(self._matrix_size)] for y in range(self._matrix_size)]
 
     def __init__(self, orientation=None):
         """Initializes the orientation and color variables.
@@ -822,13 +826,17 @@ class Piece:
         Parameters
         ----------
         orientation : bool list (default None)
-            An optional starting orientation. Used when rotating a piece so that it's new position can be tested before replacing origional orientation. A 4 by 4 list of booleans describing the relative positions of all Blocks.
+            An optional starting orientation. Used when rotating a piece so that it's new position can be tested before replacing origional orientation. A matrix of booleans describing the relative positions of all blocks.
         """
         if orientation is None:
             global deepcopy
             self.orientation = deepcopy(self._init_orient)
         else:
             self.orientation = orientation
+
+        self._matrix_size = len(self._init_orient)
+
+        print(f'DEBUG: matrix_size = {self._matrix_size} [Piece.__init__]')
 
 
     def rotate_cw(self):
@@ -841,14 +849,13 @@ class Piece:
         Piece-like
             The same type of piece but with an orientation grid rotated clockwise.
         """
-        new_orientation = [[False for x in range(4)] for y in range(4)]
+        new_orientation = self._empty_orient()
 
         # Rotate
         for y, row in enumerate(self.orientation):
             for x, block in enumerate(row):
-                new_orientation[x][3-y] = block
-
-        new_orientation = self._push_topleft(new_orientation)
+                # self._matrix_size-1 is the index of the end of the matrix
+                new_orientation[x][self._matrix_size-1-y] = block
 
         return self.__class__(new_orientation)
 
@@ -862,50 +869,15 @@ class Piece:
         Piece-like
             The same type of piece but with an orientation grid rotated clockwise.
         """
-        new_orientation = [[False for x in range(4)] for y in range(4)]
+        new_orientation = self._empty_orient()
 
         # Rotate
         for y, row in enumerate(self.orientation):
             for x, block in enumerate(row):
-                new_orientation[3-x][y] = block
-
-        new_orientation = self._push_topleft(new_orientation)
+                # self._matrix_size-1 is the index of the end of the matrix
+                new_orientation[self._matrix_size-1-x][y] = block
 
         return self.__class__(new_orientation)
-
-    def _push_topleft(self, orient):
-        """Pushes blocks in orient as far to the topleft as possible.
-
-        Parameters
-        ----------
-        orient : bool list
-            The 4 by 4 array of booleans describing relative block positions
-
-        Returns
-        -------
-        bool list
-            The same 4 by 4 array but with the contents pushed to the top left.
-        """
-        # Check for blank rows, move up
-        while True:
-            try:
-                for block in orient[0]:
-                    if block:
-                        raise StopIteration
-                blank = orient.pop(0)
-                orient.append(blank)
-            except StopIteration:
-                break
-
-        # Check for blank columns, move left
-        # for row in orient:
-        #     if row[0]:
-        #         break
-        # else:
-        #     for row in orient:
-        #         row.append(row.pop(0))
-
-        return orient
 
 
     def get_blocks(self):
@@ -916,9 +888,9 @@ class Piece:
         Returns
         -------
         list
-            Returns a 4 by 4 grid with None in empty spots and a Palette color in place of where blocks would be.
+            Returns a matrix corresponding to the orient with None in empty spots and a Palette color in place of where blocks would be.
         """
-        blocks = [[None for x in range(4)] for y in range(4)]
+        blocks = self._empty_orient()
 
         for y, row in enumerate(self.orientation):
             for x, block in enumerate(row):
@@ -926,6 +898,26 @@ class Piece:
                     blocks[y][x] = self.color
 
         return blocks
+
+    def gen_profile(self):
+        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
+        global render
+
+        # After possible rotation, the block should be oriented to fit in a 2 by 4 image.
+        if self._rot_for_profile is 1:
+            p = self.rotate_cw()
+        elif self._rot_for_profile is -1:
+            p = self.rotate_ccw()
+        else:
+            p = self
+
+        p = p.get_blocks()[:2]
+        # If not a 4 by 4 matrix, add empty columns to fit the 2 by 4 image.
+        if len(p[0]) < 4:
+            for row in p:
+                row.append(None)
+
+        self.__class__.profile = render(p)
 
     def __str__(self):
         """Creates a string representation of the Piece for debuging."""
@@ -945,90 +937,55 @@ class I_Piece(Piece):
         [True, False, False, False]
     ]
     color = Palette.I
-
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        p = self.rotate_cw()
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(p.get_blocks()[:2])
+    _rot_for_profile = 1
 class J_Piece(Piece):
 
     _init_orient = [
-        [False, True, False, False],
-        [False, True, False, False],
-        [True, True, False, False],
-        [False, False, False, False]
+        [False, True, False],
+        [False, True, False],
+        [True, True, False]
     ]
     color = Palette.J
-
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        p = self.rotate_cw()
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(p.get_blocks()[:2])
+    _rot_for_profile = 1
 class L_Piece(Piece):
 
     _init_orient = [
-        [True, False, False, False],
-        [True, False, False, False],
-        [True, True, False, False],
-        [False, False, False, False]
+        [False, True, False],
+        [False, True, False],
+        [False, True, True]
     ]
     color = Palette.L
-
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        p = self.rotate_ccw()
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(p.get_blocks()[:2])
+    _rot_for_profile = -1
 class S_Piece(Piece):
 
     _init_orient = [
-        [False, True, True, False],
-        [True, True, False, False],
-        [False, False, False, False],
-        [False, False, False, False]
+        [False, True, True],
+        [True, True, False],
+        [False, False, False]
     ]
     color = Palette.S
-
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2])
 class Z_Piece(Piece):
 
     _init_orient = [
-        [True, True, False, False],
-        [False, True, True, False],
-        [False, False, False, False],
-        [False, False, False, False]
+        [True, True, False],
+        [False, True, True],
+        [False, False, False]
     ]
     color = Palette.Z
+class T_Piece(Piece):
 
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2])
+    _init_orient = [
+        [False, True, False],
+        [True, True, True],
+        [False, False, False]
+    ]
+    color = Palette.T
 class O_Piece(Piece):
 
     _init_orient = [
-        [True, True, False, False],
-        [True, True, False, False],
-        [False, False, False, False],
-        [False, False, False, False]
+        [False, True, True],
+        [False, True, True],
+        [False, False, False]
     ]
     color = Palette.O
 
@@ -1039,30 +996,7 @@ class O_Piece(Piece):
         """Overrides Piece.rotate_cw. Returns self to avoid issues."""
         return self
 
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2])
-class T_Piece(Piece):
-
-    _init_orient = [
-        [False, True, False, False],
-        [True, True, True, False],
-        [False, False, False, False],
-        [False, False, False, False]
-    ]
-    color = Palette.T
-
-    def gen_profile(self):
-        """Creates a PIL.Image showing the piece on its side to be displayed in hold and next canvases."""
-        global render
-
-        # After rotation, the block should be oriented to fit in a 2 by 4 image.
-        self.__class__.profile = render(self.get_blocks()[:2])
-
-PIECES = (I_Piece, J_Piece, L_Piece, S_Piece, Z_Piece, O_Piece, T_Piece)
+PIECES = (I_Piece, J_Piece, L_Piece, S_Piece, Z_Piece, T_Piece, O_Piece)
 
 
 def freeze_test(game):
