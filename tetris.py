@@ -28,13 +28,15 @@ class Constants:
     # In milliseconds:
     START_SPEED = 1.0
     # Multiplied by the speed
-    SPEED_STEP = 1 / 2
+    SPEED_STEP = 2 / 3
     # Lines to clear before speed changes
     LINES_SPEED_STEP = 4
 
     # In pixels:
     # Should be divisible by 10
     GAME_WIDTH = 400
+    # Border size
+    BD_SIZE = 5
 
 
     # DON'T MANUALLY ADJUST
@@ -203,10 +205,12 @@ class App:
 
         # Appearance
         self.hold_cvs['bg'] = bg_color
+        self.hold_cvs['relief'] = 'sunken'
+        self.hold_cvs['bd'] = Constants.BD_SIZE
 
         # Init image
         # Position is the center of the image, hence the / 2
-        self._hold_im_center = (hold_size / 2, hold_size / 2)
+        self._hold_im_center = ((hold_size / 2) + Constants.BD_SIZE, (hold_size / 2) + Constants.BD_SIZE)
         self._hold_im = PIL.Image.new('RGB', (hold_size, hold_size), Palette.BLANK)
         self._hold_im = PIL.ImageTk.PhotoImage(self._hold_im)
         self.hold_cvs.create_image(self._hold_im_center, image=self._hold_im)
@@ -223,9 +227,11 @@ class App:
 
         # Appearance
         self.game_cvs['bg'] = bg_color
+        self.game_cvs['relief'] = 'sunken'
+        self.game_cvs['bd'] = Constants.BD_SIZE
 
         # Init image
-        self._game_im_center = (game_sizex / 2, game_sizey / 2)
+        self._game_im_center = ((game_sizex / 2) + Constants.BD_SIZE, (game_sizey / 2) + Constants.BD_SIZE)
         self._game_im = PIL.Image.new('RGB', (game_sizex, game_sizey), Palette.BLANK)
         self._game_im = PIL.ImageTk.PhotoImage(self._game_im)
         self.game_cvs.create_image(self._game_im_center, image=self._game_im)
@@ -243,9 +249,11 @@ class App:
 
         # Appearance
         self.next_cvs['bg'] = bg_color
+        self.next_cvs['relief'] = 'sunken'
+        self.next_cvs['bd'] = Constants.BD_SIZE
 
         # Init image
-        self._next_im_center = (next_sizex / 2, next_sizey / 2)
+        self._next_im_center = ((next_sizex / 2) + Constants.BD_SIZE, (next_sizey / 2) + Constants.BD_SIZE)
         self._next_im = PIL.Image.new('RGB', (next_sizex, next_sizey), Palette.BLANK)
         self._next_im = PIL.ImageTk.PhotoImage(self._next_im)
         self.next_cvs.create_image(self._next_im_center, image=self._next_im)
@@ -365,9 +373,11 @@ class App:
         speed : int
             The current speed.
         """
+        speed = 1 / speed
+
         new_score = f'Score:\n{score}\n'
         new_lines = f'Lines:\n{lines}\n'
-        new_speed = f'Speed:\n{speed:.3f} s/b'
+        new_speed = f'Speed:\n{speed:.3f} b/s'
 
         self.info_lbl['text'] = new_score + new_lines + new_speed
 
@@ -658,10 +668,11 @@ class Game:
         print(f'DEBUG: score = {self.score}')
 
         self._lines_step_counter -= lines
-        if self._lines_step_counter == 0:
+        if self._lines_step_counter <= 0:
             global Constants
 
-            self._lines_step_counter = Constants.LINES_SPEED_STEP
+            # Allow excess lines to overflow to next counter
+            self._lines_step_counter += Constants.LINES_SPEED_STEP
             self.speed *= Constants.SPEED_STEP
             self.drop_timer.interval = self.speed
 
