@@ -10,6 +10,7 @@ try:
 except:
     print('There was a problem setting DPI Awareness')
 
+# Import PIL
 try:
     import PIL.Image
     import PIL.ImageTk
@@ -269,7 +270,7 @@ class App:
         game: Game
             The instance of game that is being played. Needed in order to bind events to the tk application.
         """
-
+        # WASD Controls
         self.root.bind_all('<s>', game.down)
         self.root.bind_all('<space>', game.hard_drop)
 
@@ -281,7 +282,17 @@ class App:
 
         self.root.bind_all('<w>', game.hold)
 
-        self.root.bind_all('<z>', game.lose)
+        self.root.bind_all('<p>', game.lose)
+
+        # Arrow Controls
+        self.root.bind_all('<Down>', game.down)
+
+        self.root.bind_all('<Left>', game.left)
+        self.root.bind_all('<Right>', game.right)
+
+        self.root.bind_all('<Up>', game.rotate_cw)
+
+        self.root.bind_all('<z>', game.hold)
 
 
     def get_ready(self):
@@ -424,8 +435,8 @@ class Game:
 
         self.update_cvs()
 
-        print('DEBUG: Game.start drop loop off')
-        # self.drop_timer.start()
+        # print('DEBUG: Game.start drop loop off')
+        self.drop_timer.start()
 
         self.app.run()
 
@@ -789,7 +800,7 @@ class RepeatedTimer:
 
 
 class Piece:
-    """Base class for tetris piece. Can be used as an iterator to get Block objects.
+    """Base class for tetris piece.
 
     Class variables
     ---------------
@@ -835,8 +846,6 @@ class Piece:
             self.orientation = orientation
 
         self._matrix_size = len(self._init_orient)
-
-        print(f'DEBUG: matrix_size = {self._matrix_size} [Piece.__init__]')
 
 
     def rotate_cw(self):
@@ -904,9 +913,9 @@ class Piece:
         global render
 
         # After possible rotation, the block should be oriented to fit in a 2 by 4 image.
-        if self._rot_for_profile is 1:
+        if self._rot_for_profile == 1:
             p = self.rotate_cw()
-        elif self._rot_for_profile is -1:
+        elif self._rot_for_profile == -1:
             p = self.rotate_ccw()
         else:
             p = self
@@ -928,6 +937,45 @@ class Piece:
 
         return fin
 
+class Two_State_Piece(Piece):
+    """A tetris piece that specifically has two states (rotation states) and has altered rotation functions that abuse this fact.
+
+    Class Variables
+    ---------------
+    first_state : bool
+        Tells which state the piece is in. True if using _init_orient (first state), False if using _alt_orient (second state).
+    """
+
+    # Inherited Pieces should replace _init_orient and:
+    _alt_orient = [[False for x in range(4)] for y in range(4)]
+
+    def __init__(self, init_orientation=True):
+        """Initializes the orientation and color variables.
+
+        Parameters
+        ----------
+        init_orientation : bool list (default True)
+            Determines if the piece is in first state (_init_orient) or second state (_alt_orient). True for first state, False for second.
+        """
+        global deepcopy
+        if init_orientation:
+            self.orientation = deepcopy(self._init_orient)
+            self.first_state = True
+        else:
+            self.orientation = deepcopy(self._alt_orient)
+            self.first_state = False
+
+        self._matrix_size = len(self._init_orient)
+
+
+    def rotate_cw(self):
+        """Overwrites Piece.rotate_cw to just returning a new piece with the opposite orientation."""
+        return self.__class__(not self.first_state)
+
+    def rotate_ccw(self):
+        """Overwrites Piece.rotate_ccw to just returning a new piece with the opposite orientation."""
+        return self.__class__(not self.first_state)
+
 class I_Piece(Piece):
 
     _init_orient = [
@@ -936,6 +984,13 @@ class I_Piece(Piece):
         [True, False, False, False],
         [True, False, False, False]
     ]
+    # If I decide that this is a Two_State_Piece again:
+    # _alt_orient = [
+    #     [True, True, True, True],
+    #     [False, False, False, False],
+    #     [False, False, False, False],
+    #     [False, False, False, False]
+    # ]
     color = Palette.I
     _rot_for_profile = 1
 class J_Piece(Piece):
@@ -956,20 +1011,30 @@ class L_Piece(Piece):
     ]
     color = Palette.L
     _rot_for_profile = -1
-class S_Piece(Piece):
+class S_Piece(Two_State_Piece):
 
     _init_orient = [
         [False, True, True],
         [True, True, False],
         [False, False, False]
     ]
+    _alt_orient = [
+        [True, False, False],
+        [True, True, False],
+        [False, True, False]
+    ]
     color = Palette.S
-class Z_Piece(Piece):
+class Z_Piece(Two_State_Piece):
 
     _init_orient = [
         [True, True, False],
         [False, True, True],
         [False, False, False]
+    ]
+    _alt_orient = [
+        [False, False, True],
+        [False, True, True],
+        [False, True, False]
     ]
     color = Palette.Z
 class T_Piece(Piece):
