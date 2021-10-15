@@ -177,7 +177,7 @@ class App:
         Parameters
         ----------
         game: Game
-            The instance of game that is being played. Needed in order to bind events to the tk application.
+            The instance of game that is being played. Needed in order to bind events to the tk application and to bind game.lose to when the window is closed.
 
         Returns
         -------
@@ -186,13 +186,9 @@ class App:
         """
         global Constants, Palette
 
-        bg_color = Palette.BLANK_HEX
-
 
         self.root = tk.Tk()
         self.root.title('Tetris')
-        # Appearance
-        self.root['bg'] = 'black'
 
 
         # HOLD CANVAS
@@ -204,7 +200,6 @@ class App:
         self.hold_cvs.config(width=hold_size, height=hold_size)
 
         # Appearance
-        self.hold_cvs['bg'] = bg_color
         self.hold_cvs['relief'] = 'sunken'
         self.hold_cvs['bd'] = Constants.BD_SIZE
 
@@ -226,7 +221,6 @@ class App:
         self.game_cvs.config(width=game_sizex, height=game_sizey)
 
         # Appearance
-        self.game_cvs['bg'] = bg_color
         self.game_cvs['relief'] = 'sunken'
         self.game_cvs['bd'] = Constants.BD_SIZE
 
@@ -248,7 +242,6 @@ class App:
         self.next_cvs.config(width=next_sizex, height=next_sizey)
 
         # Appearance
-        self.next_cvs['bg'] = bg_color
         self.next_cvs['relief'] = 'sunken'
         self.next_cvs['bd'] = Constants.BD_SIZE
 
@@ -262,12 +255,23 @@ class App:
         # SCORE LABEL
         self.info_lbl = tk.Label(self.root, text='init text')
         self.info_lbl.grid(row=1, column=0, sticky='esw')
+        self.info_lbl['fg'] = 'white'
+
+
+        # ON CLOSE PROTOCOL
+        def on_closing():
+            """Protocol handler for when the window should close."""
+            game.lose()
+        self.root.protocol("WM_DELETE_WINDOW", on_closing)
 
 
         # FINAL SETTINGS
-        # Disable window resizing
+        self.set_background(Palette.BLANK_HEX)
         self.update_lbl(0, 0, Constants.START_SPEED)
+
+        # Disable window resizing
         self.root.resizable(False, False)
+
         self.make_bindings(game)
 
     def make_bindings(self, game):
@@ -301,6 +305,28 @@ class App:
         self.root.bind_all('<Up>', game.rotate_cw)
 
         self.root.bind_all('<z>', game.hold)
+
+    def set_background(self, color, container=None):
+        """Recursively sets the background of every widget to color.
+
+        Parameters
+        ----------
+        color : int tuple
+            The rgb color to set the backgrounds to.
+        container : Tk object (default = None)
+            The container to look through for widgets and more containers to change the background of.
+        """
+        if container is None:
+            container = self.root
+
+        container.config(bg=color)
+
+        for child in container.winfo_children():
+            if child.winfo_children():
+                # child has children, go through its children
+                self.set_background(color, child)
+            else:
+                child.config(bg=color)
 
 
     def get_ready(self):
@@ -455,6 +481,8 @@ class Game:
 
         self.drop_timer.stop()
         self.app.stop()
+
+        self.app.root.destroy()
 
         print(' * * *   G A M E   O V E R   * * *')
 
@@ -1116,10 +1144,3 @@ def freeze_test(game):
 if __name__ == '__main__':
     init()
     game = Game()
-
-    # freeze_test(game)
-
-    # WHEN TESTING, A LOOP MUST BE USED FOR IMAGES TO DISPLAY
-    # input('Enter to quit: ')
-    game.drop_timer.stop()
-    game.app.root.destroy()
