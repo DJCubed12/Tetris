@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import messagebox
 from threading import Timer
 from random import choice
 from copy import deepcopy
@@ -254,14 +255,14 @@ class App:
 
         # SCORE LABEL
         self.info_lbl = tk.Label(self.root, text='init text')
-        self.info_lbl.grid(row=1, column=0, sticky='esw')
+        self.info_lbl.grid(row=1, column=0, sticky='nesw')
         self.info_lbl['fg'] = 'white'
 
 
         # ON CLOSE PROTOCOL
         def on_closing():
             """Protocol handler for when the window should close."""
-            game.lose()
+            game.stop()
         self.root.protocol("WM_DELETE_WINDOW", on_closing)
 
 
@@ -271,6 +272,8 @@ class App:
 
         # Disable window resizing
         self.root.resizable(False, False)
+
+        self.root.after_idle(self.get_ready)
 
         self.make_bindings(game)
 
@@ -331,15 +334,15 @@ class App:
 
     def get_ready(self):
         """Show a pop-up window with instructions and a start button."""
-        print('TO DO: App.get_ready')
+        global messagebox
 
-    def run(self):
-        """Starts the main event loop for the tkinter application."""
-        self.root.mainloop()
+        messagebox.showinfo('Instructions', 'TO DO: Write Instructions [App.get_ready]')
 
-    def stop(self, event=None):
-        """Stop the tk event loop."""
-        self.root.quit()
+    def play_again(self):
+        """The user has lost. Display stats and ask for another round. If yes return True for Game, else destroy the tk application."""
+        global messagebox
+
+        return messagebox.askyesno('Play Again?', 'TO DO: Play again message [App.play_again]')
 
 
     def update_game(self, new_image):
@@ -401,8 +404,8 @@ class App:
         """
         speed = 1 / speed
 
-        new_score = f'Score:\n{score}\n'
-        new_lines = f'Lines:\n{lines}\n'
+        new_score = f'Score:\n{score}\n\n'
+        new_lines = f'Lines:\n{lines}\n\n'
         new_speed = f'Speed:\n{speed:.3f} b/s'
 
         self.info_lbl['text'] = new_score + new_lines + new_speed
@@ -438,13 +441,15 @@ class Game:
         Number of lines left until speed changes. Resets to Constants.LINES_SPEED_STEP.
     """
 
-    def __init__(self):
+    def __init__(self, app=None):
         """Creates the App object. Initializes variables. Calls app.get_ready before starting the game."""
         global RepeatedTimer
         global Constants
         global App
 
-        self.app = App(self)
+        if app is None:
+            app = App(self)
+        self.app = app
 
         # The displayed gamefield is 10x20, the extra 3 rows are where the pieces start from.
         self.gamefield = [[None for x in range(10)] for y in range(23)]
@@ -461,7 +466,6 @@ class Game:
         self.held = None
 
         # Show instructions and then play
-        self.app.get_ready()
         self.start()
 
     def start(self):
@@ -474,17 +478,22 @@ class Game:
         # print('DEBUG: Game.start drop loop off')
         self.drop_timer.start()
 
-        self.app.run()
+        self.app.root.mainloop()
 
-    def lose(self, event=None):
-        print('TO DO: self.lose')
+    def stop(self, event=None):
+        """Stops the game and the tk interface."""
 
         self.drop_timer.stop()
-        self.app.stop()
-
         self.app.root.destroy()
 
-        print(' * * *   G A M E   O V E R   * * *')
+    def lose(self):
+        """Called once the user has lost the game. Asks the user to play again. If not calls stop to end everything."""
+        self.drop_timer.stop()
+
+        if self.app.play_again():
+            self.__init__(self.app)
+        else:
+            self.stop()
 
 
     def hold(self, event=None):
