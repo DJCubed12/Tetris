@@ -273,8 +273,6 @@ class App:
         # Disable window resizing
         self.root.resizable(False, False)
 
-        self.root.after_idle(self.get_ready)
-
         self.make_bindings(game)
 
     def make_bindings(self, game):
@@ -332,17 +330,51 @@ class App:
                 child.config(bg=color)
 
 
-    def get_ready(self):
-        """Show a pop-up window with instructions and a start button."""
+    def start(self, call_me):
+        """Starts the event loop and calls get_ready to display instructions. call_me is a function that will be called once the user has closed the get_ready popup."""
+
+        def get_ready():
+            """Show a pop-up window with instructions and a start button."""
+            global messagebox
+
+            message = "Welcome to my homebrew Python version of Tetris.\n"
+            message += "Everyone who doesn't live under a rock knows the rules, so I'm not going to explain them here. However the controls I will explain.\n\n"
+
+            message += "Controls:\n"
+            message += "   Move left/right - A / D or left / right arrows\n"
+            message += "   Rotate left/right - Q / E or up arrow (only rotate right)\n"
+            message += "   Down - S or down arrow\n"
+            message += "   Hard drop - Space\n"
+            message += "   Hold - W or Z\n"
+            message += "   Quit - P\n\n"
+
+            message += "Made by Carson Jones (2021). Source code: https://github.com/DJCubed12/Tetris\n"
+
+            messagebox.showinfo('Instructions', message)
+
+            call_me()
+
+        self.root.after_idle(get_ready)
+        self.root.mainloop()
+
+
+
+        call_me()
+
+    def play_again(self, score, lines, speed):
+        """The user has lost. Display stats and ask for another round. If yes return True for Game."""
         global messagebox
 
-        messagebox.showinfo('Instructions', 'TO DO: Write Instructions [App.get_ready]')
+        message = "GAME OVER\n\n"
 
-    def play_again(self):
-        """The user has lost. Display stats and ask for another round. If yes return True for Game, else destroy the tk application."""
-        global messagebox
+        message += f"Final Stats:\n"
+        message += f"   Score - {score}\n"
+        message += f"   Lines - {lines}\n"
+        message += f"   Speed - {speed:.3f} b/s\n\n"
 
-        return messagebox.askyesno('Play Again?', 'TO DO: Play again message [App.play_again]')
+        message += f"Play Again?\n"
+
+        return messagebox.askyesno('Play Again?', message)
 
 
     def update_game(self, new_image):
@@ -475,10 +507,7 @@ class Game:
 
         self.update_cvs()
 
-        # print('DEBUG: Game.start drop loop off')
-        self.drop_timer.start()
-
-        self.app.root.mainloop()
+        self.app.start(self.drop_timer.start)
 
     def stop(self, event=None):
         """Stops the game and the tk interface."""
@@ -490,7 +519,7 @@ class Game:
         """Called once the user has lost the game. Asks the user to play again. If not calls stop to end everything."""
         self.drop_timer.stop()
 
-        if self.app.play_again():
+        if self.app.play_again(self.score, self.lines_complete, self.speed):
             self.__init__(self.app)
         else:
             self.stop()
