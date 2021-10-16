@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import messagebox
 from threading import Timer
 from random import choice
-from copy import deepcopy
 
 # DPI Awareness
 try:
@@ -465,7 +464,7 @@ class App:
         message += f"Final Stats:\n"
         message += f"   Score - {score}\n"
         message += f"   Lines - {lines}\n"
-        message += f"   Speed - {(1/speed):.3f} b/s\n\n"
+        message += f"   Speed - {(1/speed):.3f} blocks/sec\n\n"
 
         message += f"Play Again?\n"
 
@@ -529,11 +528,9 @@ class App:
         speed : int
             The current speed.
         """
-        speed = 1 / speed
-
         new_score = f'Score:\n{score}\n\n'
         new_lines = f'Lines:\n{lines}\n\n'
-        new_speed = f'Speed:\n{speed:.3f} b/s'
+        new_speed = f'Speed:\n{1/speed:.3f} blocks/sec'
 
         self.info_lbl['text'] = new_score + new_lines + new_speed
 
@@ -1027,8 +1024,7 @@ class Piece:
             An optional starting orientation. Used when rotating a piece so that it's new position can be tested before replacing origional orientation. A matrix of booleans describing the relative positions of all blocks.
         """
         if orientation is None:
-            global deepcopy
-            self.orientation = deepcopy(self._init_orient)
+            self.orientation = self._init_orient
         else:
             self.orientation = orientation
 
@@ -1144,12 +1140,11 @@ class Two_State_Piece(Piece):
         init_orientation : bool list (default True)
             Determines if the piece is in first state (_init_orient) or second state (_alt_orient). True for first state, False for second.
         """
-        global deepcopy
         if init_orientation:
-            self.orientation = deepcopy(self._init_orient)
+            self.orientation = self._init_orient
             self.first_state = True
         else:
-            self.orientation = deepcopy(self._alt_orient)
+            self.orientation = self._alt_orient
             self.first_state = False
 
         self._matrix_size = len(self._init_orient)
