@@ -442,7 +442,8 @@ class App:
             message += "   Hold - W or Z\n"
             message += "   Quit - P\n\n"
 
-            message += "Made by Carson Jones (2021). Source code: https://github.com/DJCubed12/Tetris\n"
+            message += "Made by Carson Jones (2021).\n"
+            message += "Source code: https://github.com/DJCubed12/Tetris"
 
             messagebox.showinfo('Instructions', message)
 
@@ -601,9 +602,9 @@ class Game:
 
         self.update_cvs()
 
-        print('DEBUG: self.drop_timer.start not passed [Game.start]')
-        self.app.start(lambda: None)
-        # self.app.start(self.drop_timer.start)
+        # print('DEBUG: self.drop_timer.start not passed [Game.start]')
+        # self.app.start(lambda: None)
+        self.app.start(self.drop_timer.start)
 
     def stop(self, event=None):
         """Stops the game and the tk interface."""
