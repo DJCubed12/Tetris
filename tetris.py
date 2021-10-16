@@ -79,13 +79,6 @@ class Palette:
 generated_squares = dict()
 
 
-def init():
-    """To be called when game is created. Sets up some global variables including the profiles of each Piece child class."""
-    global PIECES
-
-    for p in PIECES:
-        p().gen_profile()
-
 def block_render(color=None, block=False, grid=False):
     """Renders the image of a single square.
 
@@ -1285,5 +1278,7 @@ def freeze_test(game):
             game.make_permanent()
 
 if __name__ == '__main__':
-    init()
+    for p in PIECES:
+        p().gen_profile()
+
     game = Game()
