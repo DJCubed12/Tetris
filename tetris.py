@@ -370,7 +370,7 @@ class App:
         message += f"Final Stats:\n"
         message += f"   Score - {score}\n"
         message += f"   Lines - {lines}\n"
-        message += f"   Speed - {speed:.3f} b/s\n\n"
+        message += f"   Speed - {(1/speed):.3f} b/s\n\n"
 
         message += f"Play Again?\n"
 
