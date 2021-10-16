@@ -67,7 +67,7 @@ class Palette:
     BLANK = (127, 127, 127)
     BLANK_HEX = '#' + _get_blank_hex(BLANK)
 
-    GRIDLINE = (255, 255, 255)
+    GRIDLINE = (0, 0, 0)
 
     I = (0, 255, 255)
     J = (0, 0, 255)
