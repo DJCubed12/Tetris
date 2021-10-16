@@ -15,6 +15,7 @@ except:
 try:
     import PIL.Image
     import PIL.ImageTk
+    import PIL.ImageDraw
 except ModuleNotFoundError:
     print('\n-----')
     print("This program requires the Python library 'Pillow'. Use pip or pipenv install pillow to download the library (virtual environment is encouraged).")
@@ -42,7 +43,7 @@ class Constants:
 
     # DON'T MANUALLY ADJUST
     if GAME_WIDTH % 10:
-        raise ValueError('_GAME_WIDTH must be divisible by 10.')
+        raise ValueError('GAME_WIDTH must be divisible by 10.')
     # Fixed aspect ratio
     GAME_SIZE = (GAME_WIDTH, GAME_WIDTH * 2)
     # Pixels per block
@@ -66,6 +67,8 @@ class Palette:
     BLANK = (127, 127, 127)
     BLANK_HEX = '#' + _get_blank_hex(BLANK)
 
+    GRIDLINE = (255, 255, 255)
+
     I = (0, 255, 255)
     J = (0, 0, 255)
     L = (255, 127, 0)
@@ -74,7 +77,7 @@ class Palette:
     O = (255, 255, 0)
     T = (128, 0, 128)
 
-BLANK_SQUARE = PIL.Image.new('RGB', (Constants.BLOCK_SIZE, Constants.BLOCK_SIZE), Palette.BLANK)
+generated_squares = dict()
 
 
 def init():
@@ -83,6 +86,75 @@ def init():
 
     for p in PIECES:
         p().gen_profile()
+
+def block_render(color=None, block=False, grid=False):
+    """Renders the image of a single square.
+
+    Parameters
+    ----------
+    color : int tuple (default = None)
+        The rgb value of the square. If None, Palette.BLANK will be used
+    block : bool (default = False)
+        Determines if the block style overlay should be used.
+    grid : bool (default = False)
+        Determines if the gridline overlay should be used.
+
+    Returns
+    -------
+    PIL.Image
+        Image of the square.
+    """
+    global PIL
+    global Constants
+    global Palette
+
+    size = Constants.BLOCK_SIZE
+
+    if not color:
+        color = Palette.BLANK
+
+    square = PIL.Image.new('RGB', (size, size), color)
+
+    im_draw = PIL.ImageDraw.Draw(square, 'RGB')
+    max_index = size-1
+
+    if grid:
+        line_list = [
+            # (x, y)
+            (0, max_index),
+            (max_index, max_index),
+            (max_index, 0)
+        ]
+        im_draw.line(line_list, fill=Palette.GRIDLINE)
+
+    if block:
+        border = size * 0.2
+
+        line_list = [
+            (0, 0),
+            (0, max_index),
+            (border, max_index - border),
+            (border, border),
+            (0, 0),
+            (max_index, 0),
+            (max_index - border, border),
+            (border, border)
+        ]
+        im_draw.line(line_list, fill=Palette.GRIDLINE)
+
+        line_list = [
+            (max_index, max_index),
+            (max_index, 0),
+            (max_index - border, border),
+            (max_index - border, max_index - border),
+            (max_index, max_index),
+            (0, max_index),
+            (border, max_index - border),
+            (max_index - border, max_index - border)
+        ]
+        im_draw.line(line_list, fill=Palette.GRIDLINE)
+
+    return square
 
 def render(field, piece=None, piece_coord=None):
     """Converts the list field to a PIL.ImageTk.PhotoImage object and returns it.
@@ -104,7 +176,8 @@ def render(field, piece=None, piece_coord=None):
         Image of field.
     """
     global Constants
-    global BLANK_SQUARE
+    global generated_squares
+    global block_render
 
     y_pixels = len(field) * Constants.BLOCK_SIZE
     x_pixels = len(field[0]) * Constants.BLOCK_SIZE
@@ -113,12 +186,21 @@ def render(field, piece=None, piece_coord=None):
 
     for y, row in enumerate(field):
         for x, block in enumerate(row):
-            # block will be either None or a Palette color
-            if block:
-                box = (x * Constants.BLOCK_SIZE, y * Constants.BLOCK_SIZE, (x+1) * Constants.BLOCK_SIZE, (y+1) * Constants.BLOCK_SIZE)
+            box = (x * Constants.BLOCK_SIZE, y * Constants.BLOCK_SIZE, (x+1) * Constants.BLOCK_SIZE, (y+1) * Constants.BLOCK_SIZE)
 
-                # block is a Palette color
-                im.paste(block, box)
+            try:
+                # Use cached image if present
+                square = generated_squares[block].copy()
+            except KeyError:
+                # Generates and caches block image
+                if block:
+                    square = block_render(block, block=True)
+                else:
+                    # Block is an empty square
+                    square = block_render(grid=True)
+                generated_squares[block] = square.copy()
+
+            im.paste(square, box)
 
     if piece:
         for relative_y, row in enumerate(piece.get_blocks()):
@@ -137,10 +219,22 @@ def render(field, piece=None, piece_coord=None):
 
                     box = (x * Constants.BLOCK_SIZE, y * Constants.BLOCK_SIZE, (x+1) * Constants.BLOCK_SIZE, (y+1) * Constants.BLOCK_SIZE)
 
-                    # block is a Palette color
-                    im.paste(piece.color, box)
+                    try:
+                        # Use cached image if present
+                        square = generated_squares[block].copy()
+                    except KeyError:
+                        # Generates and caches block image
+                        if block is None:
+                            # Block is an empty square
+                            square = block_render(grid=True)
+                        else:
+                            square = block_render(block, block=True)
+                        generated_squares[block] = square.copy()
+
+                    im.paste(square, box)
 
     return im
+
 
 class App:
     """Controls the tkinter application used as an interface for the game.
@@ -507,7 +601,9 @@ class Game:
 
         self.update_cvs()
 
-        self.app.start(self.drop_timer.start)
+        print('DEBUG: self.drop_timer.start not passed [Game.start]')
+        self.app.start(lambda: None)
+        # self.app.start(self.drop_timer.start)
 
     def stop(self, event=None):
         """Stops the game and the tk interface."""
@@ -515,7 +611,7 @@ class Game:
         self.drop_timer.stop()
         self.app.root.destroy()
 
-    def lose(self):
+    def lose(self, event=None):
         """Called once the user has lost the game. Asks the user to play again. If not calls stop to end everything."""
         self.drop_timer.stop()
 
@@ -533,6 +629,7 @@ class Game:
         global PIL
         global Constants
         global Palette
+        global render
 
         # If this is the first held piece
         if self.held is None:
@@ -553,8 +650,15 @@ class Game:
         size = 4 * Constants.BLOCK_SIZE
         im = PIL.Image.new('RGB', (size, size), Palette.BLANK)
 
+        blank_row = render([[None for x in range(4)]])
+        box = (0, 0, size, Constants.BLOCK_SIZE)
+        im.paste(blank_row.copy(), box)
+
         box = (0, Constants.BLOCK_SIZE, size, size - Constants.BLOCK_SIZE)
         im.paste(self.held.profile, box)
+
+        box = (0, size - Constants.BLOCK_SIZE, size, size)
+        im.paste(blank_row.copy(), box)
 
         self.app.update_hold(im)
         self.update_cvs()
@@ -731,8 +835,6 @@ class Game:
         if lines == 4:
             self.score += 100
 
-        print(f'DEBUG: score = {self.score}')
-
         self._lines_step_counter -= lines
         if self._lines_step_counter <= 0:
             global Constants
@@ -741,8 +843,6 @@ class Game:
             self._lines_step_counter += Constants.LINES_SPEED_STEP
             self.speed *= Constants.SPEED_STEP
             self.drop_timer.interval = self.speed
-
-            print(f'DEBUG: speed = {self.speed}')
 
         self.app.update_lbl(self.score, self.lines_complete, self.speed)
 
@@ -812,6 +912,15 @@ class Game:
             sizey = 14 * Constants.BLOCK_SIZE
 
             im = PIL.Image.new('RGB', (sizex, sizey), Palette.BLANK)
+
+            # Place a blank row of grid squares between each profile
+            blank_row = render([[None for x in range(4)]])
+            y = 2
+            for i in range(4):
+                box = (0, y * Constants.BLOCK_SIZE, sizex, (y + 1) * Constants.BLOCK_SIZE)
+                im.paste(blank_row.copy(), box)
+
+                y += 3
 
             y = 0
             for i, p in enumerate(self.pieces):
