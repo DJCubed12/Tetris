@@ -598,9 +598,7 @@ class Game:
 
     def stop(self, event=None):
         """Stops the game and the tk interface."""
-
         self.drop_timer.stop()
-        self.app.root.destroy()
 
     def lose(self, event=None):
         """Called once the user has lost the game. Asks the user to play again. If not calls stop to end everything."""
@@ -609,7 +607,7 @@ class Game:
         if self.app.play_again(self.score, self.lines_complete, self.speed):
             self.__init__(self.app)
         else:
-            self.stop()
+            self.app.root.destroy()
 
 
     def hold(self, event=None):
